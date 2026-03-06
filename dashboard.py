@@ -296,28 +296,47 @@ def apply_custom_styles():
     /* MOBILE RESPONSIVENESS */
     @media (max-width: 768px) {
         .score-banner .score {
-            font-size: 2.2rem;
+            font-size: 1.8rem !important; /* Smaller for mobile */
+        }
+        .score-banner .info {
+            font-size: 0.8rem !important;
         }
         .score-banner {
-            padding: 1rem;
+            padding: 0.8rem !important;
+            margin-bottom: 1rem !important;
         }
         .win-prob-container {
-            flex-direction: column;
-            gap: 1rem;
+            flex-direction: column !important;
+            gap: 0.8rem !important;
         }
         .win-prob-card {
-            width: 100%;
-            min-width: unset;
-            padding: 1rem;
+            width: 100% !important;
+            min-width: unset !important;
+            padding: 0.8rem !important;
         }
         .win-prob-value {
-            font-size: 2.2rem;
+            font-size: 2rem !important;
+        }
+        .win-prob-label {
+            font-size: 0.75rem !important;
+            letter-spacing: 1px !important;
         }
         .stat-value {
-            font-size: 1.3rem;
+            font-size: 1.2rem !important;
+        }
+        .stat-label {
+            font-size: 0.65rem !important;
         }
         .section-header {
-            font-size: 0.9rem;
+            font-size: 0.85rem !important;
+            letter-spacing: 1px !important;
+        }
+        /* Tighten up padding */
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
         }
     }
 </style>
@@ -360,11 +379,11 @@ def create_win_probability_gauge(india_prob: float, nz_prob: float) -> go.Figure
     fig.add_trace(go.Indicator(
         mode="gauge+number",
         value=india_prob * 100,
-        number={"suffix": "%", "font": {"size": 36, "color": "#ff9500", "family": "JetBrains Mono"}},
-        title={"text": "🇮🇳 INDIA", "font": {"size": 16, "color": "#e6edf3"}},
+        number={"suffix": "%", "font": {"size": 28, "color": "#ff9500", "family": "JetBrains Mono"}},
+        title={"text": "🇮🇳 INDIA", "font": {"size": 14, "color": "#8b949e"}},
         gauge={
             "axis": {"range": [0, 100], "tickcolor": "#333", "tickwidth": 1},
-            "bar": {"color": "#ff6b00", "thickness": 0.7},
+            "bar": {"color": "#ff6b00", "thickness": 0.75},
             "bgcolor": "rgba(30,30,50,0.3)",
             "borderwidth": 0,
             "steps": [
@@ -384,11 +403,11 @@ def create_win_probability_gauge(india_prob: float, nz_prob: float) -> go.Figure
     fig.add_trace(go.Indicator(
         mode="gauge+number",
         value=nz_prob * 100,
-        number={"suffix": "%", "font": {"size": 36, "color": "#58a6ff", "family": "JetBrains Mono"}},
-        title={"text": "🇳🇿 NEW ZEALAND", "font": {"size": 16, "color": "#e6edf3"}},
+        number={"suffix": "%", "font": {"size": 28, "color": "#58a6ff", "family": "JetBrains Mono"}},
+        title={"text": "🇳🇿 NEW ZEALAND", "font": {"size": 14, "color": "#8b949e"}},
         gauge={
             "axis": {"range": [0, 100], "tickcolor": "#333", "tickwidth": 1},
-            "bar": {"color": "#3884f4", "thickness": 0.7},
+            "bar": {"color": "#3884f4", "thickness": 0.75},
             "bgcolor": "rgba(30,30,50,0.3)",
             "borderwidth": 0,
             "steps": [
@@ -405,8 +424,8 @@ def create_win_probability_gauge(india_prob: float, nz_prob: float) -> go.Figure
     ), row=1, col=2)
 
     fig.update_layout(
-        height=280,
-        margin=dict(l=30, r=30, t=50, b=20),
+        height=220,
+        margin=dict(l=20, r=20, t=40, b=10),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font={"family": "Inter"}
