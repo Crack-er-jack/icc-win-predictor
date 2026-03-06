@@ -13,8 +13,10 @@ AI-powered real-time win probability predictor for **IND vs NZ** cricket matches
 - **🧠 GNN Prediction** — Graph Attention Network models batter vs bowler matchups to predict next-ball outcomes
 - **🎲 Monte Carlo Simulation** — 10,000 parallel match simulations in under 1 second (NumPy vectorized)
 - **📊 Real-Time Dashboard** — Premium dark-themed Streamlit dashboard with Plotly charts
+- **📱 Mobile Responsive** — Dynamic CSS layout optimized for perfect viewing on smartphones
 - **🔮 "What If?" Analysis** — Instant scenario testing ("What if next ball is a wicket?")
 - **📡 Live Scraping** — ESPN Cricinfo ball-by-ball commentary scraper
+- **🏏 T20 Calibrated** — Specifically tuned for T20 dynamics (20 overs, ~185 par score)
 - **⏰ Auto-Switch** — Moves from Demo to Live Mode automatically at **7:00 PM on March 8th, 2026**
 - **🎬 Demo Mode** — Realistic simulated match for showcasing before match day
 

@@ -47,7 +47,7 @@ def setup_page():
 # ============================================================================
 
 def apply_custom_styles():
-    """Inject custom CSS for the dark theme."""
+    """Inject custom CSS for the dark theme with mobile responsiveness."""
     st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -291,6 +291,34 @@ def apply_custom_styles():
     /* Sidebar */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #0d1117 0%, #161b22 100%);
+    }
+
+    /* MOBILE RESPONSIVENESS */
+    @media (max-width: 768px) {
+        .score-banner .score {
+            font-size: 2.2rem;
+        }
+        .score-banner {
+            padding: 1rem;
+        }
+        .win-prob-container {
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .win-prob-card {
+            width: 100%;
+            min-width: unset;
+            padding: 1rem;
+        }
+        .win-prob-value {
+            font-size: 2.2rem;
+        }
+        .stat-value {
+            font-size: 1.3rem;
+        }
+        .section-header {
+            font-size: 0.9rem;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
