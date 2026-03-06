@@ -32,18 +32,23 @@ from simulator import MatchSimulator
 # Page Configuration
 # ============================================================================
 
-st.set_page_config(
-    page_title="🏏 ICC Win Predictor — IND vs NZ",
-    page_icon="🏏",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Move set_page_config inside a function to avoid being called multiply during imports
+def setup_page():
+    """Configure Streamlit page settings."""
+    st.set_page_config(
+        page_title="🏏 ICC Win Predictor — IND vs NZ",
+        page_icon="🏏",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
 
 # ============================================================================
 # Custom CSS for Premium Dark Theme
 # ============================================================================
 
-st.markdown("""
+def apply_custom_styles():
+    """Inject custom CSS for the dark theme."""
+    st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
@@ -308,7 +313,7 @@ def init_session_state():
     if "auto_refresh" not in st.session_state:
         st.session_state.auto_refresh = True
 
-init_session_state()
+# Removed top-level call to init_session_state()
 
 
 # ============================================================================
@@ -661,7 +666,7 @@ def render_dashboard():
 
     # Gauge chart
     gauge_fig = create_win_probability_gauge(india_wp, nz_wp)
-    st.plotly_chart(gauge_fig, use_container_width=True, key="gauge")
+    st.plotly_chart(gauge_fig, width="stretch", key="gauge")
 
     # ---- STATS ROW ----
     stat_cols = st.columns(5)
@@ -707,7 +712,7 @@ def render_dashboard():
                     unsafe_allow_html=True)
         history = data.get("history", {"overs": [], "india_win": [], "nz_win": []})
         timeline_fig = create_win_prob_timeline(history)
-        st.plotly_chart(timeline_fig, use_container_width=True, key="timeline")
+        st.plotly_chart(timeline_fig, width="stretch", key="timeline")
 
         # Momentum chart (runs per over)
         st.markdown('<div class="section-header">📊 Runs Per Over</div>',
@@ -718,7 +723,7 @@ def render_dashboard():
             ms.get("current_run_rate", 0),
             ms.get("required_run_rate", 0)
         )
-        st.plotly_chart(mom_fig, use_container_width=True, key="momentum")
+        st.plotly_chart(mom_fig, width="stretch", key="momentum")
 
     with right_col:
         # GNN Outcome Probabilities
@@ -726,14 +731,14 @@ def render_dashboard():
                     unsafe_allow_html=True)
         outcome_data = data.get("outcome_probs", {})
         outcome_fig = create_outcome_probs_chart(outcome_data)
-        st.plotly_chart(outcome_fig, use_container_width=True, key="outcomes")
+        st.plotly_chart(outcome_fig, width="stretch", key="outcomes")
 
         # Player Impact
         st.markdown('<div class="section-header">👤 Player Impact</div>',
                     unsafe_allow_html=True)
         player_impact = data.get("player_impact", {})
         impact_fig = create_player_impact_chart(player_impact)
-        st.plotly_chart(impact_fig, use_container_width=True, key="impact")
+        st.plotly_chart(impact_fig, width="stretch", key="impact")
 
     # ---- COMMENTARY TICKER ----
     st.markdown('<div class="section-header">💬 Live Commentary</div>',
@@ -818,7 +823,7 @@ def render_sidebar():
     )
 
     # Manual refresh button
-    if st.sidebar.button("🔄 Refresh Now", use_container_width=True):
+    if st.sidebar.button("🔄 Refresh Now", width="stretch"):
         st.session_state.dashboard_data = st.session_state.simulator.refresh()
         st.session_state.refresh_count += 1
         st.rerun()
@@ -866,12 +871,21 @@ def render_sidebar():
 # Main Render
 # ============================================================================
 
-render_dashboard()
-render_sidebar()
+def main():
+    """Main function to render the dashboard."""
+    setup_page()
+    apply_custom_styles()
+    init_session_state()
+    
+    render_dashboard()
+    render_sidebar()
 
-# Auto-refresh mechanism
-if st.session_state.auto_refresh:
-    time.sleep(10)
-    st.session_state.dashboard_data = st.session_state.simulator.refresh()
-    st.session_state.refresh_count += 1
-    st.rerun()
+    # Auto-refresh mechanism
+    if st.session_state.auto_refresh:
+        time.sleep(10)
+        st.session_state.dashboard_data = st.session_state.simulator.refresh()
+        st.session_state.refresh_count += 1
+        st.rerun()
+
+if __name__ == "__main__":
+    main()
