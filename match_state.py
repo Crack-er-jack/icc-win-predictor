@@ -1,0 +1,276 @@
+"""
+match_state.py — Cricket Match State Management
+
+Maintains the complete state of a cricket match, computes derived statistics,
+and provides the interface between raw ball events and the ML/simulation layers.
+"""
+
+from dataclasses import dataclass, field
+from typing import List, Dict, Optional, Tuple
+import numpy as np
+
+
+@dataclass
+class PlayerStats:
+    """Individual player statistics for the current innings."""
+    name: str
+    runs: int = 0
+    balls_faced: int = 0
+    fours: int = 0
+    sixes: int = 0
+    is_out: bool = False
+    dismissal: str = ""
+
+    @property
+    def strike_rate(self) -> float:
+        return (self.runs / self.balls_faced * 100) if self.balls_faced > 0 else 0.0
+
+
+@dataclass
+class BowlerStats:
+    """Individual bowler statistics for the current innings."""
+    name: str
+    overs: float = 0.0
+    runs_conceded: int = 0
+    wickets: int = 0
+    maidens: int = 0
+    dots: int = 0
+
+    @property
+    def economy(self) -> float:
+        return (self.runs_conceded / self.overs) if self.overs > 0 else 0.0
+
+
+@dataclass
+class MatchState:
+    """
+    Complete state of a cricket match at any given point.
+    This is the central data structure consumed by GNN and Monte Carlo modules.
+    """
+
+    # Core match info
+    batting_team: str = "India"
+    bowling_team: str = "New Zealand"
+    innings: int = 2  # We focus on the chase (2nd innings)
+    target: int = 268
+
+    # Current score state
+    score: int = 0
+    wickets: int = 0
+    overs_completed: int = 0
+    balls_in_current_over: int = 0
+
+    # Derived chase metrics
+    runs_remaining: int = 268
+    balls_remaining: int = 300  # 50 overs × 6 balls
+    wickets_left: int = 10
+
+    # Run rates
+    current_run_rate: float = 0.0
+    required_run_rate: float = 5.36  # target / 50
+
+    # Current players on field
+    striker: str = "Rohit Sharma"
+    non_striker: str = "Shubman Gill"
+    bowler: str = "Trent Boult"
+
+    # Ball-by-ball history
+    ball_history: List[dict] = field(default_factory=list)
+
+    # Recent over tracking for momentum
+    recent_overs: List[int] = field(default_factory=list)  # runs per over
+
+    # Partnership tracking
+    current_partnership_runs: int = 0
+    current_partnership_balls: int = 0
+
+    # Player stats
+    batter_stats: Dict[str, PlayerStats] = field(default_factory=dict)
+    bowler_stats: Dict[str, BowlerStats] = field(default_factory=dict)
+
+    def update_from_ball_events(self, events: list):
+        """
+        Update the match state from a list of BallEvent objects.
+        Recomputes all derived metrics.
+        """
+        if not events:
+            return
+
+        # Reset and recompute from all events
+        self.ball_history = []
+        self.batter_stats = {}
+        self.bowler_stats = {}
+        self.recent_overs = []
+        current_over_runs = 0
+        current_over_balls = 0
+        last_over_num = -1
+
+        for event in events:
+            # Track ball history
+            self.ball_history.append({
+                "over": event.over,
+                "runs": event.runs,
+                "is_wicket": event.is_wicket,
+                "batter": event.batter,
+                "bowler": event.bowler,
+                "is_boundary": event.is_boundary,
+                "is_six": event.is_six,
+                "commentary": event.commentary
+            })
+
+            # Update batter stats
+            if event.batter not in self.batter_stats:
+                self.batter_stats[event.batter] = PlayerStats(name=event.batter)
+            bs = self.batter_stats[event.batter]
+            bs.balls_faced += 1
+            if not event.is_wicket:
+                bs.runs += event.runs
+                if event.runs == 4:
+                    bs.fours += 1
+                elif event.runs == 6:
+                    bs.sixes += 1
+            else:
+                bs.is_out = True
+
+            # Update bowler stats
+            if event.bowler not in self.bowler_stats:
+                self.bowler_stats[event.bowler] = BowlerStats(name=event.bowler)
+
+            # Track overs for momentum
+            over_num = int(event.over)
+            if over_num != last_over_num:
+                if last_over_num >= 0:
+                    self.recent_overs.append(current_over_runs)
+                current_over_runs = 0
+                current_over_balls = 0
+                last_over_num = over_num
+
+            current_over_runs += event.runs
+            current_over_balls += 1
+
+        # Add the current (incomplete) over
+        if current_over_balls > 0:
+            self.recent_overs.append(current_over_runs)
+
+        # Update core state from the last event
+        last = events[-1]
+        self.score = last.total_score
+        self.wickets = last.total_wickets
+        self.striker = last.batter if not last.is_wicket else last.non_striker
+        self.non_striker = last.non_striker if not last.is_wicket else "Next Batter"
+        self.bowler = last.bowler
+
+        # Compute derived metrics
+        self._compute_derived_stats()
+
+    def _compute_derived_stats(self):
+        """Recompute all derived statistics from current state."""
+        total_balls = len(self.ball_history)
+        self.overs_completed = total_balls // 6
+        self.balls_in_current_over = total_balls % 6
+
+        overs_decimal = total_balls / 6.0
+
+        self.runs_remaining = max(self.target - self.score, 0)
+        self.balls_remaining = max(300 - total_balls, 0)
+        self.wickets_left = max(10 - self.wickets, 0)
+
+        # Current run rate
+        self.current_run_rate = (
+            round(self.score / overs_decimal, 2) if overs_decimal > 0 else 0.0
+        )
+
+        # Required run rate
+        remaining_overs = self.balls_remaining / 6.0
+        self.required_run_rate = (
+            round(self.runs_remaining / remaining_overs, 2)
+            if remaining_overs > 0 else 999.99
+        )
+
+    def get_momentum(self, last_n_overs: int = 2) -> float:
+        """
+        Calculate momentum based on recent overs.
+        Positive = batting team accelerating, Negative = slowing down.
+        Returns the difference between recent RR and overall RR.
+        """
+        if len(self.recent_overs) < last_n_overs:
+            return 0.0
+
+        recent = self.recent_overs[-last_n_overs:]
+        recent_rr = sum(recent) / last_n_overs
+        return round(recent_rr - self.current_run_rate, 2)
+
+    def get_over_by_over_runs(self) -> List[int]:
+        """Get runs scored in each completed over."""
+        if len(self.recent_overs) > 1:
+            return self.recent_overs[:-1]  # exclude current incomplete over
+        return self.recent_overs
+
+    def get_feature_vector(self) -> np.ndarray:
+        """
+        Convert match state to a feature vector for ML models.
+        Returns normalized features suitable for neural network input.
+        """
+        features = np.array([
+            self.score / 350.0,                    # normalized score
+            self.wickets / 10.0,                   # normalized wickets
+            self.runs_remaining / 350.0,           # normalized runs remaining
+            self.balls_remaining / 300.0,           # normalized balls remaining
+            self.current_run_rate / 12.0,           # normalized CRR
+            self.required_run_rate / 15.0,          # normalized RRR
+            self.wickets_left / 10.0,               # normalized wickets left
+            self.get_momentum() / 6.0,             # normalized momentum
+            self.current_partnership_runs / 100.0,  # partnership progress
+            1.0 if self.balls_remaining < 60 else 0.0  # death overs flag
+        ], dtype=np.float32)
+
+        return features
+
+    def get_match_phase(self) -> str:
+        """Determine current match phase."""
+        overs = len(self.ball_history) / 6.0
+        if overs < 10:
+            return "Powerplay"
+        elif overs < 35:
+            return "Middle Overs"
+        else:
+            return "Death Overs"
+
+    def is_innings_complete(self) -> bool:
+        """Check if the innings is over."""
+        return (
+            self.wickets >= 10 or
+            self.balls_remaining <= 0 or
+            self.score >= self.target
+        )
+
+    def get_result(self) -> Optional[str]:
+        """Get match result if innings is complete."""
+        if not self.is_innings_complete():
+            return None
+        if self.score >= self.target:
+            return f"{self.batting_team} win by {self.wickets_left} wickets!"
+        elif self.wickets >= 10 or self.balls_remaining <= 0:
+            return f"{self.bowling_team} win by {self.runs_remaining} runs!"
+        return None
+
+    def to_dict(self) -> dict:
+        """Serialize match state to dictionary."""
+        return {
+            "batting_team": self.batting_team,
+            "bowling_team": self.bowling_team,
+            "score": self.score,
+            "wickets": self.wickets,
+            "overs": f"{self.overs_completed}.{self.balls_in_current_over}",
+            "target": self.target,
+            "runs_remaining": self.runs_remaining,
+            "balls_remaining": self.balls_remaining,
+            "wickets_left": self.wickets_left,
+            "current_run_rate": self.current_run_rate,
+            "required_run_rate": self.required_run_rate,
+            "striker": self.striker,
+            "non_striker": self.non_striker,
+            "bowler": self.bowler,
+            "momentum": self.get_momentum(),
+            "phase": self.get_match_phase()
+        }
