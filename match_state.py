@@ -52,7 +52,8 @@ class MatchState:
     batting_team: str = "India"
     bowling_team: str = "New Zealand"
     innings: int = 1  # 1st innings
-    target: int = 0   # No target yet
+    target: int = 256   # Target for NZ chase
+    first_innings_score: int = 255 # India's final score
 
     # Current score state
     score: int = 0
@@ -120,6 +121,23 @@ class MatchState:
         last_over_num = -1
 
         for event in events:
+            # Detect innings transition (over reset)
+            if self.ball_history and event.over < self.ball_history[-1]["over"]:
+                if self.innings == 1:
+                    # Capture 1st innings state
+                    self.first_innings_score = self.score
+                    self.target = self.score + 1
+                    self.innings = 2
+                    # Swap teams
+                    self.batting_team, self.bowling_team = self.bowling_team, self.batting_team
+                    # Reset current innings stats for the chase
+                    self.ball_history = []
+                    self.score = 0
+                    self.wickets = 0
+                    self.batter_stats = {}
+                    self.bowler_stats = {}
+                    # Continue processing the rest of the events in the new context
+            
             # Track ball history
             self.ball_history.append({
                 "over": event.over,

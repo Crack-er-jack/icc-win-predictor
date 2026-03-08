@@ -740,6 +740,10 @@ def render_dashboard():
     target = ms.get('target', 0)
     
     # ---- SCORE BANNER ----
+    target = ms.get('target', 0)
+    first_inn_score = ms.get('first_innings_score', 0)
+    innings_num = ms.get('innings', 1)
+    
     if is_break:
         banner_content = f"""
         <div class="score-banner" style="border-color: #ff9500; background: linear-gradient(145deg, #161b22 0%, #2a1b0a 100%);">
@@ -766,31 +770,57 @@ def render_dashboard():
         """
     else:
         # Standard Live Banner
-        innings_text = "1st Innings" if ms.get('innings', 1) == 1 else "2nd Innings"
-        target_text = f"Target: {target}" if target > 0 else "Build a huge total!"
+        innings_num = ms.get('innings', 2) 
+        batting_team = ms.get('batting_team', 'New Zealand' if innings_num == 2 else 'India')
         
-        banner_content = f"""
-        <div class="score-banner">
-            <div style="font-size: 0.85rem; color: #8b949e; font-weight: 600;
-                 letter-spacing: 1px; text-transform: uppercase;">
-                {ms.get('batting_team', 'India')} vs {ms.get('bowling_team', 'New Zealand')}
-                  &nbsp;•&nbsp; {innings_text}
-            </div>
-            <div class="score">
-                {ms.get('score', 0)}/{ms.get('wickets', 0)}
-            </div>
-            <div class="info">
-                <span style="font-family: 'JetBrains Mono'; font-size: 1.1rem;">
-                    ({ms.get('overs', '0.0')} overs)
+        # India Score Blob (Small Pill)
+        india_blob = ""
+        if innings_num == 2:
+            india_blob = f"""
+            <div style="display: flex; justify-content: center; margin-bottom: 0.5rem;">
+                <span style="background: rgba(255, 107, 0, 0.2); color: #ff9500; 
+                      padding: 2.5px 14px; border-radius: 20px; font-size: 0.85rem; 
+                      font-weight: 700; border: 1px solid rgba(255, 107, 0, 0.4);
+                      box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+                    🇮🇳 IND: {first_inn_score}/5 (Innings Closed)
                 </span>
             </div>
-            <div class="target" style="margin-top: 0.3rem;">
-                {target_text} &nbsp;•&nbsp; CRR: {ms.get('current_run_rate', 0)}
+            """
+        
+        # Chase logic
+        info_text = f"({ms.get('overs', '0.0')} overs)"
+        if innings_num == 2:
+            runs_needed = ms.get('runs_remaining', 0)
+            balls_left = ms.get('balls_remaining', 0)
+            chase_text = f"NZ need {runs_needed} runs in {balls_left} balls"
+            score_color = "linear-gradient(135deg, #58a6ff, #1f6feb)" # NZ Blue Gradient
+            status_text = "New Zealand is Batting"
+        else:
+            chase_text = "Build a huge total!"
+            score_color = "linear-gradient(135deg, #ff6b00, #ff9500)" # India Orange Gradient
+            status_text = f"{batting_team} is Batting"
+
+        banner_content = f"""
+        <div class="score-banner">
+            {india_blob}
+            <div style="font-size: 0.9rem; color: #8b949e; font-weight: 700;
+                 letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 0.4rem;">
+                {status_text} &nbsp;•&nbsp; {f"{innings_num}nd Innings" if innings_num > 1 else "1st Innings"}
+            </div>
+            <div class="score" style="background: {score_color}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1.1;">
+                {ms.get('score', 0)}/{ms.get('wickets', 0)}
+            </div>
+            <div class="info" style="margin-top: 0.2rem;">
+                <span style="font-family: 'JetBrains Mono'; font-size: 1.25rem; font-weight: 600; color: #e6edf3;">
+                    {info_text}
+                </span>
+            </div>
+            <div class="target" style="margin-top: 0.6rem; color: #58a6ff; font-size: 1.05rem; letter-spacing: 0.3px;">
+                {chase_text} &nbsp;•&nbsp; <span style="color: #8b949e;">CRR: {ms.get('current_run_rate', 0)}</span>
             </div>
         </div>
         """
-    
-    st.markdown(banner_content, unsafe_allow_html=True)
+        st.markdown(banner_content, unsafe_allow_html=True)
 
     # ---- WIN PROBABILITY SECTION ----
     india_wp = pred.get("india_win_prob", 0.5)

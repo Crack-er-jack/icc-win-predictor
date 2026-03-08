@@ -233,10 +233,17 @@ class MatchSimulator:
         self.current_probs: Optional[np.ndarray] = None
         self.what_if_results: List[Dict] = []
 
-        # Initialize with existing data
-        events = self.data_manager.get_all_events()
-        if events:
-            self.match_state.update_from_ball_events(events)
+        # Update match state
+        all_events = self.data_manager.get_all_events()
+        if all_events:
+            self.match_state.update_from_ball_events(all_events)
+            
+        # FORCE 2nd innings if demo and target is set
+        if self.data_manager.is_demo() and self.match_state.target > 0:
+            self.match_state.innings = 2
+            self.match_state.batting_team = "New Zealand"
+            self.match_state.bowling_team = "India"
+            self.match_state.first_innings_score = self.match_state.target - 1
             self._run_prediction()
 
         print(f"\n  🏁 System ready! Mode: {self.data_manager.mode.upper()}")
@@ -315,12 +322,11 @@ class MatchSimulator:
         )
         
         # Handle team swap for Win Probability
-        # If we are in 1st innings (or break), 'batting_team_win_prob' is India's win prob
-        # if India is batting (which they are).
+        # In 2nd innings, India is BOWLING.
         if self.match_state.innings == 1:
             india_prob = result["batting_team_win_prob"]
         else:
-            # India is bowling in 2nd innings, so win prob is 'bowling_team_win_prob'
+            # India is bowling in 2nd innings, so their win prob is 'bowling_team_win_prob'
             india_prob = result["bowling_team_win_prob"]
 
         # Apply starting bias for realism
@@ -334,7 +340,8 @@ class MatchSimulator:
         result["nz_win_prob"] = float(1.0 - india_prob)
         
         # Map for dashboard compatibility
-        result["batting_team_win_prob"] = result["india_win_prob"] if self.match_state.innings == 1 else result["nz_win_prob"]
+        # result["batting_team_win_prob"] is the win prob of whoever is currently batting
+        result["batting_team_win_prob"] = result["nz_win_prob"] if self.match_state.innings == 2 else result["india_win_prob"]
         result["bowling_team_win_prob"] = 1.0 - result["batting_team_win_prob"]
 
         self.current_prediction = result
