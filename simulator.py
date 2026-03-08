@@ -348,34 +348,26 @@ class MatchSimulator:
             india_prob = result["bowling_team_win_prob"]
 
         # ----------------------------------------------------------------
-        # DYNAMIC SCOREBOARD BIAS (For Real-Time Feel)
+        # DYNAMIC SCOREBOARD BIAS (Requested: 77% baseline for India defending)
         # ----------------------------------------------------------------
-        # 1. Required Run Rate Bias (Crucial for 2nd innings)
         if self.match_state.innings == 2:
+            # Baseline 77% for India
+            india_base = 0.77
+            
+            # Fluctuate by +/- 5% max based on match state
             rrr = self.match_state.required_run_rate
-            crr = self.match_state.current_run_rate
+            wickets = self.match_state.wickets
             
-            # If RRR is high (>10), bowling team (India) gets a boost
-            if rrr > 10.0:
-                pressure_factor = min(0.35, (rrr - 10.0) * 0.05)
-                india_prob += pressure_factor
+            # RRR above 12 is good for India, 1 wicket is good
+            rrr_bias = min(0.03, max(-0.03, (rrr - 12.0) * 0.01))
+            wicket_bias = min(0.02, max(0, (wickets - 1) * 0.01))
             
-            # Wicket count bias
-            # Every early wicket for the bowling team (India) is huge
-            wicket_impact = self.match_state.wickets * 0.05
-            india_prob += wicket_impact
-            
-            # Momentum adjustment
-            momentum = self.match_state.get_momentum()
-            india_prob -= (0.04 * momentum) # Negative momentum helps India (bowlers)
+            india_prob = float(np.clip(india_base + rrr_bias + wicket_bias, 0.72, 0.82))
         else:
             # 1st Innings: Basic momentum
             momentum = self.match_state.get_momentum()
-            india_prob += (0.04 * momentum)
+            india_prob = float(np.clip(india_prob + (0.04 * momentum), 0.01, 0.99))
 
-        # Ensure probabilities are realistic (0.01 to 0.99)
-        india_prob = float(np.clip(india_prob, 0.01, 0.99))
-        
         result["india_win_prob"] = india_prob
         result["nz_win_prob"] = 1.0 - india_prob
         

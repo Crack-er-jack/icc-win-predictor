@@ -87,10 +87,10 @@ def apply_custom_styles():
         font-size: 1.1rem;
         letter-spacing: 1.5px;
         text-transform: uppercase;
-        color: #8b949e;
+        color: #e6edf3;
         margin-bottom: 0.5rem;
         padding-bottom: 0.5rem;
-        border-bottom: 2px solid rgba(88, 166, 255, 0.15);
+        border-bottom: 2px solid rgba(88, 166, 255, 0.25);
     }
 
     /* Match score banner */
@@ -116,7 +116,7 @@ def apply_custom_styles():
 
     .score-banner .info {
         font-size: 1rem;
-        color: #8b949e;
+        color: #e6edf3;
         margin-top: 0.3rem;
     }
 
@@ -193,7 +193,7 @@ def apply_custom_styles():
 
     .stat-label {
         font-size: 0.75rem;
-        color: #8b949e;
+        color: #e6edf3;
         text-transform: uppercase;
         letter-spacing: 1px;
         margin-top: 0.2rem;
@@ -282,7 +282,7 @@ def apply_custom_styles():
     /* Momentum indicator */
     .momentum-up { color: #3fb950; }
     .momentum-down { color: #f85149; }
-    .momentum-neutral { color: #8b949e; }
+    .momentum-neutral { color: #e6edf3; }
 
     /* Override Streamlit default backgrounds */
     .stMetric {
@@ -399,7 +399,7 @@ def create_win_probability_gauge(india_prob: float, nz_prob: float) -> go.Figure
         mode="gauge+number",
         value=india_prob * 100,
         number={"suffix": "%", "font": {"size": 28, "color": "#ff9500", "family": "JetBrains Mono"}},
-        title={"text": "🇮🇳 INDIA", "font": {"size": 14, "color": "#8b949e"}},
+        title={"text": "🇮🇳 INDIA", "font": {"size": 14, "color": "#e6edf3"}},
         gauge={
             "axis": {"range": [0, 100], "tickcolor": "#333", "tickwidth": 1},
             "bar": {"color": "#ff6b00", "thickness": 0.75},
@@ -423,7 +423,7 @@ def create_win_probability_gauge(india_prob: float, nz_prob: float) -> go.Figure
         mode="gauge+number",
         value=nz_prob * 100,
         number={"suffix": "%", "font": {"size": 28, "color": "#58a6ff", "family": "JetBrains Mono"}},
-        title={"text": "🇳🇿 NEW ZEALAND", "font": {"size": 14, "color": "#8b949e"}},
+        title={"text": "🇳🇿 NEW ZEALAND", "font": {"size": 14, "color": "#e6edf3"}},
         gauge={
             "axis": {"range": [0, 100], "tickcolor": "#333", "tickwidth": 1},
             "bar": {"color": "#3884f4", "thickness": 0.75},
@@ -494,15 +494,15 @@ def create_win_prob_timeline(history: dict) -> go.Figure:
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(
-            title={"text": "Overs", "font": {"color": "#8b949e"}},
+            title={"text": "Overs", "font": {"color": "#e6edf3"}},
             gridcolor="rgba(139, 148, 158, 0.1)",
-            tickfont=dict(color="#8b949e"),
+            tickfont=dict(color="#e6edf3"),
             range=[0, max(history["overs"][-1] + 5, 50) if history["overs"] else 50]
         ),
         yaxis=dict(
-            title={"text": "Win Probability (%)", "font": {"color": "#8b949e"}},
+            title={"text": "Win Probability (%)", "font": {"color": "#e6edf3"}},
             gridcolor="rgba(139, 148, 158, 0.1)",
-            tickfont=dict(color="#8b949e"),
+            tickfont=dict(color="#e6edf3"),
             range=[0, 100]
         ),
         legend=dict(
@@ -559,13 +559,13 @@ def create_momentum_chart(over_by_over: list, crr: float, rrr: float) -> go.Figu
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(
-            title={"text": "Over", "font": {"color": "#8b949e"}},
-            tickfont=dict(color="#8b949e"),
+            title={"text": "Over", "font": {"color": "#e6edf3"}},
+            tickfont=dict(color="#e6edf3"),
             gridcolor="rgba(139, 148, 158, 0.05)"
         ),
         yaxis=dict(
-            title={"text": "Runs", "font": {"color": "#8b949e"}},
-            tickfont=dict(color="#8b949e"),
+            title={"text": "Runs", "font": {"color": "#e6edf3"}},
+            tickfont=dict(color="#e6edf3"),
             gridcolor="rgba(139, 148, 158, 0.1)"),
         showlegend=False,
         hoverlabel=dict(bgcolor="#161b22", font_size=13)
@@ -610,8 +610,8 @@ def create_player_impact_chart(player_impact: dict) -> go.Figure:
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(
-            title={"text": "Impact %", "font": {"color": "#8b949e"}},
-            tickfont=dict(color="#8b949e"),
+            title={"text": "Impact %", "font": {"color": "#e6edf3"}},
+            tickfont=dict(color="#e6edf3"),
             gridcolor="rgba(139, 148, 158, 0.1)"
         ),
         yaxis=dict(tickfont=dict(color="#e6edf3", size=12)),
@@ -630,7 +630,7 @@ def create_outcome_probs_chart(outcome_data: dict) -> go.Figure:
         fig.update_layout(height=200, paper_bgcolor="rgba(0,0,0,0)")
         return fig
 
-    colors = ["#8b949e", "#58a6ff", "#3fb950", "#d2a8ff",
+    colors = ["#e6edf3", "#58a6ff", "#3fb950", "#d2a8ff",
               "#ff9500", "#ff6b6b", "#f85149"]
 
     fig = go.Figure(go.Pie(
@@ -652,7 +652,7 @@ def create_outcome_probs_chart(outcome_data: dict) -> go.Figure:
         annotations=[dict(
             text="Next<br>Ball",
             x=0.5, y=0.5,
-            font=dict(size=16, color="#8b949e", family="Inter"),
+            font=dict(size=16, color="#e6edf3", family="Inter"),
             showarrow=False
         )]
     )
@@ -691,13 +691,13 @@ def create_score_distribution_chart(distribution: list, current_score: int) -> g
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(
-            title={"text": "Final Score", "font": {"color": "#8b949e", "size": 12}},
-            tickfont=dict(color="#8b949e"),
+            title={"text": "Final Score", "font": {"color": "#e6edf3", "size": 12}},
+            tickfont=dict(color="#e6edf3"),
             gridcolor="rgba(139, 148, 158, 0.05)"
         ),
         yaxis=dict(
-            title={"text": "Probability", "font": {"color": "#8b949e", "size": 12}},
-            tickfont=dict(color="#8b949e"),
+            title={"text": "Probability", "font": {"color": "#e6edf3", "size": 12}},
+            tickfont=dict(color="#e6edf3"),
             gridcolor="rgba(139, 148, 158, 0.1)",
             tickformat=".1%"
         ),
@@ -767,18 +767,18 @@ def render_dashboard():
     </div>
     <div style="display: flex; justify-content: center; align-items: center; gap: 2rem;">
         <div style="text-align: right;">
-            <div style="font-size: 0.8rem; color: #8b949e;">🇮🇳 INDIA (1st Inn)</div>
+            <div style="font-size: 0.8rem; color: #e6edf3;">🇮🇳 INDIA (1st Inn)</div>
             <div style="font-size: 2.2rem; font-weight: 800; color: #e6edf3;">{ms.get('score', 0)}/{ms.get('wickets', 0)}</div>
-            <div style="font-size: 0.9rem; color: #8b949e;">({ms.get('overs', '0.0')} ov)</div>
+            <div style="font-size: 0.9rem; color: #e6edf3;">({ms.get('overs', '0.0')} ov)</div>
         </div>
         <div style="font-size: 1.5rem; color: #444; font-weight: 900;">VS</div>
         <div style="text-align: left;">
-            <div style="font-size: 0.8rem; color: #8b949e;">🇳🇿 NEW ZEALAND</div>
+            <div style="font-size: 0.8rem; color: #e6edf3;">🇳🇿 NEW ZEALAND</div>
             <div style="font-size: 2.2rem; font-weight: 800; color: #58a6ff;">TARGET {ms.get('score', 0) + 1}</div>
-            <div style="font-size: 0.9rem; color: #8b949e;">Req RR: {((ms.get('score', 0) + 1) / 20):.2f}</div>
+            <div style="font-size: 0.9rem; color: #e6edf3;">Req RR: {((ms.get('score', 0) + 1) / 20):.2f}</div>
         </div>
     </div>
-    <div style="margin-top: 1rem; font-size: 0.85rem; color: #8b949e; font-style: italic;">
+    <div style="margin-top: 1rem; font-size: 0.85rem; color: #e6edf3; font-style: italic;">
         The simulation is frozen during the ads break. Rebooting for 2nd innings soon...
     </div>
 </div>
@@ -1007,7 +1007,7 @@ def render_sidebar():
             <div style="font-weight: 700; font-size: 0.95rem; color: #e6edf3;">
                 {scenario.get('scenario', '')}
             </div>
-            <div style="font-size: 0.8rem; color: #8b949e; margin: 0.3rem 0;">
+            <div style="font-size: 0.8rem; color: #e6edf3; margin: 0.3rem 0;">
                 {scenario.get('description', '')}
             </div>
             <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
@@ -1026,7 +1026,7 @@ def render_sidebar():
     # ---- CONTROLS ----
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
-    <div style="font-weight: 700; font-size: 0.9rem; color: #8b949e;
+    <div style="font-weight: 700; font-size: 0.9rem; color: #e6edf3;
          letter-spacing: 1px; text-transform: uppercase; margin-bottom: 0.5rem;">
         ⚙️ Controls
     </div>
@@ -1048,7 +1048,7 @@ def render_sidebar():
     st.sidebar.markdown("---")
     ms = data.get("match_state", {})
     st.sidebar.markdown(f"""
-    <div style="font-size: 0.8rem; color: #8b949e; text-align: center;">
+    <div style="font-size: 0.8rem; color: #e6edf3; text-align: center;">
         Phase: <span style="color: #58a6ff; font-weight: 600;">{ms.get('phase', '—')}</span>
         <br>Striker: <span style="color: #ff9500; font-weight: 600;">{ms.get('striker', '—')}</span>
         <br>Bowler: <span style="color: #3fb950; font-weight: 600;">{ms.get('bowler', '—')}</span>
@@ -1109,9 +1109,8 @@ def main():
 
     # Auto-refresh mechanism (Heartbeat-safe)
     if st.session_state.auto_refresh:
-        # Instead of blocking for 150s (which kills health checks), 
-        # we wait in small chunks to keep the app responsive.
-        wait_time = 150
+        # Reduced to 30s as requested by user
+        wait_time = 30
         chunk = 5 
         for _ in range(wait_time // chunk):
             time.sleep(chunk)
