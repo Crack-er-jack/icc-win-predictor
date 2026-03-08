@@ -356,6 +356,7 @@ class MatchSimulator:
                     self.current_prediction["projected_score_mean"]
                 ),
                 "percentiles": self.current_prediction.get("percentiles", {}),
+                "score_distribution": self.current_prediction.get("score_distribution", []).tolist() if isinstance(self.current_prediction.get("score_distribution"), np.ndarray) else [],
                 "simulation_time": self.current_prediction.get("simulation_time", 0),
                 "all_out_pct": self.current_prediction.get(
                     "wicket_distribution", {}

@@ -643,6 +643,54 @@ def create_outcome_probs_chart(outcome_data: dict) -> go.Figure:
     return fig
 
 
+def create_score_distribution_chart(distribution: list, current_score: int) -> go.Figure:
+    """Create a histogram showing final score probability distribution."""
+    if not distribution:
+        fig = go.Figure()
+        fig.update_layout(height=250, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+        return fig
+
+    final_scores = [s + current_score for s in distribution]
+    
+    fig = go.Figure(data=[go.Histogram(
+        x=final_scores,
+        histnorm='probability',
+        marker=dict(
+            color='rgba(88, 166, 255, 0.6)',
+            line=dict(color='#58a6ff', width=1)
+        ),
+        hovertemplate="Score: %{x}<br>Probability: %{y:.1%}<extra></extra>",
+        nbinsx=25
+    )])
+
+    # Add vertical line for median
+    median_score = np.percentile(final_scores, 50)
+    fig.add_vline(x=median_score, line=dict(color="#ff9500", width=2, dash="dash"),
+                  annotation_text=f"Median: {median_score:.0f}", 
+                  annotation_font=dict(color="#ff9500", size=10))
+
+    fig.update_layout(
+        height=280,
+        margin=dict(l=40, r=20, t=10, b=40),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(
+            title={"text": "Final Score", "font": {"color": "#8b949e", "size": 12}},
+            tickfont=dict(color="#8b949e"),
+            gridcolor="rgba(139, 148, 158, 0.05)"
+        ),
+        yaxis=dict(
+            title={"text": "Probability", "font": {"color": "#8b949e", "size": 12}},
+            tickfont=dict(color="#8b949e"),
+            gridcolor="rgba(139, 148, 158, 0.1)",
+            tickformat=".1%"
+        ),
+        showlegend=False,
+        hoverlabel=dict(bgcolor="#161b22", font_size=13)
+    )
+    return fig
+
+
 # ============================================================================
 # Dashboard Layout
 # ============================================================================
@@ -713,9 +761,27 @@ def render_dashboard():
     </div>
     """, unsafe_allow_html=True)
 
-    # Gauge chart
+    # Win Probability Gauge
     gauge_fig = create_win_probability_gauge(india_wp, nz_wp)
-    st.plotly_chart(gauge_fig, width="stretch", key="gauge")
+    st.plotly_chart(gauge_fig, use_container_width=True, key="gauge")
+
+    # Final Score Predictor Alert Box
+    if "show_predictor" not in st.session_state:
+        st.session_state.show_predictor = True
+
+    if st.session_state.show_predictor:
+        pcts = pred.get("percentiles", {})
+        base_score = ms.get("score", 0)
+        low = base_score + pcts.get("p10", 0)
+        high = base_score + pcts.get("p90", 0)
+        
+        col_alert, col_close = st.columns([0.9, 0.1])
+        with col_alert:
+            st.success(f"🎯 **Final Score Predictor**: Based on 10,000 simulations, the 1st innings total is **80% likely** to finish between **{low:.0f}** and **{high:.0f}**.")
+        with col_close:
+            if st.button("✕", help="Close Predictor"):
+                st.session_state.show_predictor = False
+                safe_rerun()
 
     # ---- STATS ROW ----
     stat_cols = st.columns(5)
