@@ -323,20 +323,18 @@ class MatchSimulator:
         """Compile all data needed by the dashboard into a single dictionary."""
         # Heuristic Projections
         score = self.match_state.score
-        balls_bowled = len(self.match_state.ball_history)
-        overs = balls_bowled / 6.0 if balls_bowled > 0 else 0.1
-        crr = score / overs
+        balls_bowled = self.match_state.total_balls_bowled
+        crr = self.match_state.current_run_rate
         
         # Simple CRR projection for 20 overs
         crr_proj = round(crr * 20)
         
         # Momentum based (using last 2 overs if available)
-        recent_rr = crr
-        if len(self.match_state.recent_overs) >= 1:
-            recent_rr = sum(self.match_state.recent_overs[-2:]) / min(len(self.match_state.recent_overs), 2)
-        
+        momentum = self.match_state.get_momentum()
+        # Momentum projection: Current score + (Current RR + Momentum) * Overs Remaining
         balls_left = max(120 - balls_bowled, 0)
-        mom_proj = round(score + (recent_rr * (balls_left / 6.0)))
+        overs_left = balls_left / 6.0
+        mom_proj = round(score + ((crr + momentum) * overs_left))
 
         # Player impact: batter contributions normalized
         player_impact = {}

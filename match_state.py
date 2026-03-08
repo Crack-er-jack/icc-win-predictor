@@ -88,6 +88,20 @@ class MatchState:
     batter_stats: Dict[str, PlayerStats] = field(default_factory=dict)
     bowler_stats: Dict[str, BowlerStats] = field(default_factory=dict)
 
+    @property
+    def total_balls_bowled(self) -> int:
+        """Get the true number of balls bowled, accounting for synthetic live events."""
+        if not self.ball_history:
+            return 0
+        
+        last_event = self.ball_history[-1]
+        last_over = last_event.get("over", 0.0)
+        completed_overs = int(last_over)
+        balls_in_over = int(round((last_over - completed_overs) * 10))
+        
+        # Use the highest of raw history length or the over-based calculation
+        return max(len(self.ball_history), completed_overs * 6 + balls_in_over)
+
     def update_from_ball_events(self, events: list):
         """
         Update the match state from a list of BallEvent objects.
@@ -165,18 +179,8 @@ class MatchState:
 
     def _compute_derived_stats(self):
         """Recompute all derived statistics from current state."""
-        total_balls = len(self.ball_history)
+        effective_balls = self.total_balls_bowled
         
-        # If we are receiving synthetic events from live API, length of history might be 1 
-        # but the overs might be 5.4. We should use the highest value.
-        if self.ball_history:
-            last_over = self.ball_history[-1]["over"]
-            completed_overs = int(last_over)
-            balls_in_over = int(round((last_over - completed_overs) * 10))
-            effective_balls = max(total_balls, completed_overs * 6 + balls_in_over)
-        else:
-            effective_balls = total_balls
-
         self.overs_completed = effective_balls // 6
         self.balls_in_current_over = effective_balls % 6
 
@@ -242,10 +246,10 @@ class MatchState:
 
     def get_match_phase(self) -> str:
         """Determine current match phase."""
-        overs = len(self.ball_history) / 6.0
-        if overs < 10:
+        overs = self.total_balls_bowled / 6.0
+        if overs < 6:
             return "Powerplay"
-        elif overs < 35:
+        elif overs < 15:
             return "Middle Overs"
         else:
             return "Death Overs"
