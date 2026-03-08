@@ -277,9 +277,9 @@ class MatchSimulator:
             self.match_state.batting_team = "New Zealand"
             self.match_state.bowling_team = "India"
             # FORCE 70/4 for New Zealand correctly
-            self.match_state.score = 70
-            self.match_state.wickets = 4
-            self.match_state.overs_completed = 10
+            self.match_state.score = 72
+            self.match_state.wickets = 5
+            self.match_state.overs_completed = 8
             self.match_state._compute_derived_stats()
 
                 #         commentary += f" [TARGET: {detected_target}]"
