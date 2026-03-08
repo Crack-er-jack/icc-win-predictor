@@ -166,10 +166,21 @@ class MatchState:
     def _compute_derived_stats(self):
         """Recompute all derived statistics from current state."""
         total_balls = len(self.ball_history)
-        self.overs_completed = total_balls // 6
-        self.balls_in_current_over = total_balls % 6
+        
+        # If we are receiving synthetic events from live API, length of history might be 1 
+        # but the overs might be 5.4. We should use the highest value.
+        if self.ball_history:
+            last_over = self.ball_history[-1]["over"]
+            completed_overs = int(last_over)
+            balls_in_over = int(round((last_over - completed_overs) * 10))
+            effective_balls = max(total_balls, completed_overs * 6 + balls_in_over)
+        else:
+            effective_balls = total_balls
 
-        overs_decimal = total_balls / 6.0
+        self.overs_completed = effective_balls // 6
+        self.balls_in_current_over = effective_balls % 6
+
+        overs_decimal = effective_balls / 6.0
 
         if self.innings == 2 and self.target > 0:
             self.runs_remaining = max(self.target - self.score, 0)
@@ -182,7 +193,7 @@ class MatchState:
             self.runs_remaining = 0
             self.required_run_rate = 0.0
 
-        self.balls_remaining = max(120 - total_balls, 0)
+        self.balls_remaining = max(120 - effective_balls, 0)
         self.wickets_left = max(10 - self.wickets, 0)
 
         # Current run rate
