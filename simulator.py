@@ -192,7 +192,7 @@ class MatchSimulator:
     """
 
     def __init__(self, match_id: Optional[str] = None, demo_mode: bool = True,
-                 target: int = 185, n_simulations: int = 10000):
+                 target: int = 256, n_simulations: int = 10000):
         """
         Initialize all components of the prediction system.
 
@@ -247,7 +247,7 @@ class MatchSimulator:
         print(f"\n  🏁 System ready! Mode: {self.data_manager.mode.upper()}")
         print("=" * 60)
 
-    def refresh(self) -> Dict:
+    def refresh(self, use_live: bool = False) -> Dict:
         """
         Execute one complete refresh cycle of the prediction pipeline.
         Called every 10 seconds by the main loop or dashboard.
@@ -256,7 +256,7 @@ class MatchSimulator:
             Dictionary with complete prediction state for the dashboard.
         """
         # Step 1: Get latest ball events
-        events = self.data_manager.refresh()
+        events = self.data_manager.refresh(use_live=use_live)
 
         # Step 2: Update match state
         self.match_state.update_from_ball_events(events)

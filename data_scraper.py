@@ -306,25 +306,31 @@ class DataManager:
         self.target = target
         self.scraper = CricAPIScraper(match_id)
         
-        # FORCE LIVE MODE (User requested)
-        self.mode = "live"
-        self.demo = None
+        # Mode switch (User can toggle in UI)
+        self.mode = "demo" if demo_mode else "live"
+        self.demo = DemoMatchSimulator(target=target)
         self.events: List[BallEvent] = []
 
-        if self.scraper:
+        if self.mode == "live" and self.scraper:
             live_events = self.scraper.fetch_live_commentary()
             if live_events: 
                 self.events = live_events
+        else:
+            self.events = self.demo.events_generated.copy()
         
-    def refresh(self) -> List[BallEvent]:
-        # Always stay in live mode
-        if self.scraper:
+    def refresh(self, use_live: bool = False) -> List[BallEvent]:
+        self.mode = "live" if use_live else "demo"
+        
+        if self.mode == "live" and self.scraper:
             new_events = self.scraper.fetch_live_commentary()
             if new_events:
-                # IMPORTANT: Append to history, don't overwrite!
                 self.events.extend(new_events)
-                self.scraper.api_outage = False
-                return self.events
+        else:
+            # Demo mode behavior: Advance by one ball each refresh
+            next_ball = self.demo._generate_next_ball()
+            if next_ball:
+                self.events.append(next_ball)
+        
         return self.events
 
     def get_all_events(self) -> List[BallEvent]:

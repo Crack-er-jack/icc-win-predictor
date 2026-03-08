@@ -366,9 +366,9 @@ def apply_custom_styles():
 def init_session_state():
     """Initialize Streamlit session state on first load."""
     if "simulator" not in st.session_state:
-        # Use None for match_id to let the scraper find the India vs NZ match automatically
+        # Default to demo mode for initial load
         st.session_state.simulator = MatchSimulator(
-            match_id=None, demo_mode=False, target=256, n_simulations=10000
+            match_id=None, demo_mode=True, target=256, n_simulations=10000
         )
     if "dashboard_data" not in st.session_state:
         st.session_state.dashboard_data = st.session_state.simulator.refresh()
@@ -378,9 +378,8 @@ def init_session_state():
         st.session_state.last_updated = datetime.now().strftime("%H:%M:%S")
     if "auto_refresh" not in st.session_state:
         st.session_state.auto_refresh = True
-
-# Removed top-level call to init_session_state()
-
+    if "live_mode" not in st.session_state:
+        st.session_state.live_mode = False
 
 # ============================================================================
 # Chart Builders
@@ -456,7 +455,7 @@ def create_win_prob_timeline(history: dict) -> go.Figure:
     """Create a win probability timeline chart."""
     fig = go.Figure()
 
-    if history["overs"]:
+    if history.get("overs"):
         # India probability area
         fig.add_trace(go.Scatter(
             x=history["overs"],
@@ -497,7 +496,7 @@ def create_win_prob_timeline(history: dict) -> go.Figure:
             title={"text": "Overs", "font": {"color": "#e6edf3"}},
             gridcolor="rgba(139, 148, 158, 0.1)",
             tickfont=dict(color="#e6edf3"),
-            range=[0, max(history["overs"][-1] + 5, 50) if history["overs"] else 50]
+            range=[0, max(history["overs"][-1] + 5, 50) if history.get("overs") else 50]
         ),
         yaxis=dict(
             title={"text": "Win Probability (%)", "font": {"color": "#e6edf3"}},
@@ -715,18 +714,23 @@ def render_dashboard():
     """Render the complete dashboard."""
     data = st.session_state.dashboard_data
 
-    # ---- HEADER ----
-    badge = '<span class="live-badge">🔴 LIVE</span>'
-
-    st.markdown(f"""
-<div style="text-align: center; margin-bottom: 0.5rem;">
-    <span style="font-family: 'Inter'; font-weight: 900; font-size: 1.6rem;
-          letter-spacing: -0.5px; color: #e6edf3;">
-        🏏 ICC Win Predictor
-    </span>
-    &nbsp;&nbsp;{badge}
+    # ---- HEADER: VICTORY CELEBRATION ----
+    st.markdown("""
+<div style="text-align: center; margin-bottom: 1rem; padding: 2rem; background: linear-gradient(135deg, #ff6b00 0%, #ff9500 50%, #0038a8 100%); border-radius: 20px; box-shadow: 0 10px 30px rgba(255, 107, 0, 0.3);">
+    <h1 style="color: white; font-size: 3.5rem; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); font-weight: 900;">
+        🏆 CONGRATULATIONS INDIA ! 🇮🇳
+    </h1>
+    <p style="color: white; font-size: 1.2rem; margin-top: 0.5rem; font-weight: 600; opacity: 0.9;">
+        VICTORY SECURED IN THE ICC CRICKET WORLD CUP
+    </p>
 </div>
 """, unsafe_allow_html=True)
+
+    # Display the real-time win capture snapshot
+    if os.path.exists("image.png"):
+        st.image("image.png", use_column_width=True, caption="📸 Real-Time Match Result Capture")
+    
+    st.markdown("---")
 
     if data.get("api_outage", False):
         st.warning("⚠️ **API Connection Issue** — Showing last cached match data. Please wait for the system to reconnect...")
@@ -736,92 +740,32 @@ def render_dashboard():
 
     status = data.get("status", "live")
     is_break = status == "innings_break"
-    target = ms.get('target', 0)
     
-    # ---- SCORE BANNER ----
-    target = ms.get('target', 0)
-    first_inn_score = ms.get('first_innings_score', 0)
-    innings_num = ms.get('innings', 1)
-    
-    # SCORE BANNER FAILSAFE (Removed hardcode)
-    if first_inn_score == 0 and target > 0:
-        first_inn_score = target - 1
-        ms['first_innings_score'] = first_inn_score
-    
-    if innings_num == 1 and target > 0:
-        innings_num = 2
-        ms['innings'] = 2
-        ms['batting_team'] = "New Zealand"
-        ms['bowling_team'] = "India"
-        ms['runs_remaining'] = max(0, target - ms.get('score', 0))
-    
-    if is_break:
-        banner_content = f"""
-<div class="score-banner" style="border-color: #ff9500; background: linear-gradient(145deg, #161b22 0%, #2a1b0a 100%);">
-    <div style="font-size: 0.9rem; color: #ff9500; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 0.5rem;">
-        ⏸️ INNINGS BREAK - MATCH PAUSED
-    </div>
-    <div style="display: flex; justify-content: center; align-items: center; gap: 2rem;">
-        <div style="text-align: right;">
-            <div style="font-size: 0.8rem; color: #e6edf3;">🇮🇳 INDIA (1st Inn)</div>
-            <div style="font-size: 2.2rem; font-weight: 800; color: #e6edf3;">{ms.get('score', 0)}/{ms.get('wickets', 0)}</div>
-            <div style="font-size: 0.9rem; color: #e6edf3;">({ms.get('overs', '0.0')} ov)</div>
-        </div>
-        <div style="font-size: 1.5rem; color: #444; font-weight: 900;">VS</div>
+    # ---- SCORE BANNER (RICH UI) ----
+    target = ms.get('target', 256)
+    innings_num = ms.get('innings', 2)
+    batting_team = ms.get('batting_team', 'New Zealand' if innings_num == 2 else 'India')
+    bowling_team = ms.get('bowling_team', 'India' if innings_num == 2 else 'New Zealand')
+
+    banner_content = f"""
+<div class="score-banner" style="border-color: {'#58a6ff' if innings_num==2 else '#ff9500'};">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
         <div style="text-align: left;">
-            <div style="font-size: 0.8rem; color: #e6edf3;">🇳🇿 NEW ZEALAND</div>
-            <div style="font-size: 2.2rem; font-weight: 800; color: #58a6ff;">TARGET {ms.get('score', 0) + 1}</div>
-            <div style="font-size: 0.9rem; color: #e6edf3;">Req RR: {((ms.get('score', 0) + 1) / 20):.2f}</div>
+            <div style="font-size: 0.8rem; color: #8b949e; text-transform: uppercase; letter-spacing: 1px;">Batting: {batting_team.upper()}</div>
+            <div style="font-size: 2.8rem; font-weight: 800; color: #e6edf3; line-height: 1.1;">
+                {ms.get('score', 0)}/{ms.get('wickets', 0)}
+                <span style="font-size: 1.2rem; color: #8b949e; font-weight: 400; margin-left: 0.5rem;">({ms.get('overs', '0.0')} ov)</span>
+            </div>
         </div>
-    </div>
-    <div style="margin-top: 1rem; font-size: 0.85rem; color: #e6edf3; font-style: italic;">
-        The simulation is frozen during the ads break. Rebooting for 2nd innings soon...
+        <div style="text-align: right;">
+            <div style="font-size: 0.8rem; color: #8b949e; text-transform: uppercase; letter-spacing: 1px;">Target: {target}</div>
+            <div style="font-size: 1.1rem; color: #ff9500; font-weight: 700;">REQ: {ms.get('required_run_rate', 0)}</div>
+            <div style="font-size: 1.1rem; color: #3fb950; font-weight: 700;">CRR: {ms.get('current_run_rate', 0)}</div>
+        </div>
     </div>
 </div>
 """
-    else:
-        # Standard Live Banner
-        innings_num = ms.get('innings', 2) 
-        batting_team = ms.get('batting_team', 'New Zealand' if innings_num == 2 else 'India')
-        
-        # 1. India Score Blob (Simple & Reliable)
-        if innings_num == 2:
-            st.markdown(f"""
-<div style="text-align: center; margin-bottom: 0.8rem;">
-    <span style="background: rgba(255, 107, 0, 0.15); color: #ff9500; 
-          padding: 4px 16px; border-radius: 20px; font-size: 0.9rem; 
-          font-weight: 800; border: 1px solid rgba(255, 107, 0, 0.3);">
-        🇮🇳 INDIA: {first_inn_score}/5 (Innings Closed)
-    </span>
-</div>
-""", unsafe_allow_html=True)
-
-        # 2. Main Score Metrics (Streamlit Native = Reliable)
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col1:
-            st.metric(label=f"🇳🇿 {batting_team}", value=f"{ms.get('score', 0)}/{ms.get('wickets', 0)}")
-        with col2:
-            st.metric(label="Overs", value=f"{ms.get('overs', '0.0')}")
-        with col3:
-            if innings_num == 2:
-                balls_left = ms.get('balls_remaining', 120)
-                st.metric(label="Runs Needed", value=f"{ms.get('runs_remaining', target)}", delta=f"{balls_left} balls left", delta_color="normal")
-            else:
-                st.metric(label="CRR", value=f"{ms.get('current_run_rate', 0)}")
-
-        # 3. Dynamic Status Banner
-        runs_needed = ms.get('runs_remaining', 0)
-        balls_left = ms.get('balls_remaining', 0)
-        chase_text = f"NZ NEED {runs_needed} RUNS IN {balls_left} BALLS" if innings_num == 2 else "BUILDING A HUGE TOTAL"
-        
-        st.markdown(f"""
-<div style="background: rgba(88, 166, 255, 0.1); border-radius: 8px; padding: 12px; 
-            text-align: center; border: 1px solid rgba(88, 166, 255, 0.2); margin-top: 10px;">
-    <span style="color: #58a6ff; font-weight: 800; font-size: 1.1rem; letter-spacing: 1px;">
-        ⚡ {chase_text}
-    </span>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown(banner_content, unsafe_allow_html=True)
 
     # ---- WIN PROBABILITY SECTION ----
     india_wp = pred.get("india_win_prob", 0.5)
@@ -830,52 +774,58 @@ def render_dashboard():
     st.markdown('<div class="section-header">⚡ Win Probability</div>',
                 unsafe_allow_html=True)
 
-    # Big number display
-    st.markdown(f"""
-    <div class="win-prob-container">
-        <div class="win-prob-card win-prob-india">
-            <div class="win-prob-value" style="color: #ff9500;">{india_wp:.1%}</div>
-            <div class="win-prob-label" style="color: #ff9500;">🇮🇳 India</div>
-        </div>
-        <div style="font-size: 1.5rem; color: #333; font-weight: 700;">VS</div>
-        <div class="win-prob-card win-prob-nz">
-            <div class="win-prob-value" style="color: #58a6ff;">{nz_wp:.1%}</div>
-            <div class="win-prob-label" style="color: #58a6ff;">🇳🇿 New Zealand</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
     # Win Probability Gauge
     gauge_fig = create_win_probability_gauge(india_wp, nz_wp)
-    st.plotly_chart(gauge_fig, width="stretch", key="gauge")
+    st.plotly_chart(gauge_fig, use_container_width=True, key="gauge")
 
-    # Final Score Predictor Alert Box
-    if "show_predictor" not in st.session_state:
-        st.session_state.show_predictor = True
-
-    if st.session_state.show_predictor:
+    # ---- PROJECTION & TIMELINE ----
+    col_proj, col_trend = st.columns([1, 1.2])
+    
+    with col_proj:
+        st.markdown('<div class="section-header">🎯 AI Result Estimator</div>', unsafe_allow_html=True)
         pcts = pred.get("percentiles", {})
         base_score = ms.get("score", 0)
-        low = base_score + pcts.get("p10", 0)
-        high = base_score + pcts.get("p90", 0)
-        crr_proj = pred.get("crr_projection", 0)
-        mom_proj = pred.get("momentum_projection", 0)
         
-        col_alert, col_close = st.columns([0.9, 0.1])
-        with col_alert:
-            st.success(f"""
-            🎯 **Final Score Predictor (Hybrid)**
-            
-            - **AI Predicted (80% Prob):** {low:.0f} — {high:.0f}
-            - **Standard CRR Projection:** {crr_proj}
-            - **Recent Momentum Trend:** {mom_proj}
-            
-            *The AI model accounts for match pressure and death-over probabilities, while CRR/Momentum show raw current pace.*
-            """)
-        with col_close:
-            if st.button("✕", help="Close Predictor"):
-                st.session_state.show_predictor = False
-                safe_rerun()
+        # Display median and confidence interval
+        st.markdown(f"""
+        <div class="stat-card" style="margin-bottom: 1rem; border-left: 4px solid #ff9500;">
+            <div class="stat-label">Predicted Final Score</div>
+            <div class="stat-value" style="font-size: 2.2rem; color: #ff9500;">
+                {base_score + pcts.get('p50', 0):.0f}
+            </div>
+            <div style="font-size: 0.8rem; color: #8b949e;">
+                80% Confidence: {base_score + pcts.get('p10', 0):.0f} — {base_score + pcts.get('p90', 0):.0f}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # GNN Outcome Probabilities
+        outcome_fig = create_outcome_probs_chart(pred.get("outcome_probs", {}))
+        st.plotly_chart(outcome_fig, use_container_width=True, key="outcomes")
+
+    with col_trend:
+        st.markdown('<div class="section-header">📈 Probability Trend</div>', unsafe_allow_html=True)
+        history = data.get("history", {"overs": [], "india_win": [], "nz_win": []})
+        timeline_fig = create_win_prob_timeline(history)
+        st.plotly_chart(timeline_fig, use_container_width=True, key="timeline")
+
+    # ---- MOMENTUM & IMPACT ----
+    st.markdown('<div class="section-header">🚀 Momentum & Player Impact</div>', unsafe_allow_html=True)
+    col_mom, col_imp = st.columns(2)
+
+    with col_mom:
+        over_runs = data.get("over_by_over", [])
+        mom_fig = create_momentum_chart(
+            over_runs,
+            ms.get("current_run_rate", 0),
+            ms.get("required_run_rate", 0)
+        )
+        st.plotly_chart(mom_fig, use_container_width=True, key="momentum")
+
+    with col_imp:
+        player_impact = data.get("player_impact", {})
+        impact_fig = create_player_impact_chart(player_impact)
+        st.plotly_chart(impact_fig, use_container_width=True, key="impact")
 
     # ---- STATS ROW ----
     stat_cols = st.columns(5)
@@ -912,45 +862,6 @@ def render_dashboard():
             <div class="stat-label">Sim Time</div>
         </div>""", unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ---- MAIN CONTENT: Two columns ----
-    left_col, right_col = st.columns([3, 2])
-
-    with left_col:
-        # Win Probability Timeline
-        st.markdown('<div class="section-header">📈 Win Probability Over Time</div>',
-                    unsafe_allow_html=True)
-        history = data.get("history", {"overs": [], "india_win": [], "nz_win": []})
-        timeline_fig = create_win_prob_timeline(history)
-        st.plotly_chart(timeline_fig, width="stretch", key="timeline")
-
-        # Momentum chart (runs per over)
-        st.markdown('<div class="section-header">📊 Runs Per Over</div>',
-                    unsafe_allow_html=True)
-        over_runs = data.get("over_by_over", [])
-        mom_fig = create_momentum_chart(
-            over_runs,
-            ms.get("current_run_rate", 0),
-            ms.get("required_run_rate", 0)
-        )
-        st.plotly_chart(mom_fig, width="stretch", key="momentum")
-
-    with right_col:
-        # GNN Outcome Probabilities
-        st.markdown('<div class="section-header">🧠 GNN Next Ball Prediction</div>',
-                    unsafe_allow_html=True)
-        outcome_data = data.get("outcome_probs", {})
-        outcome_fig = create_outcome_probs_chart(outcome_data)
-        st.plotly_chart(outcome_fig, width="stretch", key="outcomes")
-
-        # Player Impact
-        st.markdown('<div class="section-header">👤 Player Impact</div>',
-                    unsafe_allow_html=True)
-        player_impact = data.get("player_impact", {})
-        impact_fig = create_player_impact_chart(player_impact)
-        st.plotly_chart(impact_fig, width="stretch", key="impact")
-
     # ---- COMMENTARY TICKER ----
     st.markdown('<div class="section-header">💬 Live Commentary</div>',
                 unsafe_allow_html=True)
@@ -983,8 +894,32 @@ def render_sidebar():
     """Render the sidebar with What If analysis and controls."""
     data = st.session_state.dashboard_data
 
+    # 1. CREATOR LINKS (Top Priority)
+    st.sidebar.markdown(f"""
+    <div style="text-align: center; padding: 1.2rem; background: rgba(88, 166, 255, 0.08); border-radius: 16px; border: 1px solid rgba(88, 166, 255, 0.15); margin-bottom: 0.8rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+        <span style="font-size: 0.8rem; color: #8b949e; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Built by</span>
+        <br>
+        <span style="font-size: 1.5rem; font-weight: 900; color: #58a6ff; letter-spacing: -0.5px;">Soumya Oruganti</span>
+        <br><br>
+        <a href="https://www.linkedin.com/in/soumya-oruganti-118958210/" target="_blank" 
+           style="display: block; padding: 0.7rem; background: linear-gradient(135deg, #0077b5, #00a0dc); color: white; 
+                   font-weight: 800; text-decoration: none; border-radius: 10px; margin-bottom: 12px; box-shadow: 0 4px 10px rgba(0,119,181,0.3);">
+           Connect on LinkedIn
+        </a>
+        <a href="mailto:osmanimadhavi@gmail.com?subject=Sponsor%20Soumya" 
+           style="display: block; padding: 0.7rem; background: linear-gradient(135deg, #ff9500, #ffb347); color: #0d1117; 
+                   font-weight: 800; text-decoration: none; border-radius: 10px; box-shadow: 0 4px 10px rgba(255,149,0,0.3);">
+           🤝 Sponsor Me
+        </a>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 2. LIVE/DEMO TOGGLE
+    st.sidebar.markdown("---")
+    
+    # ---- WHAT IF ANALYSIS ----
     st.sidebar.markdown("""
-    <div style="text-align: center; padding: 1rem 0;">
+    <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem; margin-top: 1rem;">
         <span style="font-size: 1.3rem; font-weight: 800; color: #e6edf3;">
             🔮 What If?
         </span>
@@ -1030,12 +965,12 @@ def render_sidebar():
 
     # Auto-refresh toggle
     st.session_state.auto_refresh = st.sidebar.checkbox(
-        "Auto-Refresh (150s lag)", value=st.session_state.auto_refresh
+        "Auto-Refresh", value=st.session_state.auto_refresh
     )
 
     # Manual refresh button
-    if st.sidebar.button("🔄 Refresh Now"):
-        st.session_state.dashboard_data = st.session_state.simulator.refresh()
+    if st.sidebar.button("🔄 Refresh Data"):
+        st.session_state.dashboard_data = st.session_state.simulator.refresh(use_live=st.session_state.live_mode)
         st.session_state.last_updated = datetime.now().strftime("%H:%M:%S")
         st.session_state.refresh_count += 1
         safe_rerun()
@@ -1050,44 +985,9 @@ def render_sidebar():
         <br>Bowler: <span style="color: #3fb950; font-weight: 600;">{ms.get('bowler', '—')}</span>
         <br><br>
         Refreshes: {st.session_state.refresh_count} (Last: {st.session_state.last_updated})
-        <br>10,000 Monte Carlo sims/cycle
-        <br><i style="font-size: 0.7rem; color: #58a6ff;">Probabilities fluctuate slightly per sim due to MC variance.</i>
-        <hr style="border-color: rgba(88,166,255,0.15); margin: 0.8rem 0;">
-        ⚠️ <b>API Limits Active</b>: Refresh is delayed to conserve the 100 free hits/day.
-        <br><br>
-        <a href="mailto:osmanimadhavi@gmail.com?subject=Sponsor%20Soumya%20to%20build%20awesome%20ai%20projects" 
-           style="display: inline-block; padding: 0.5rem 1rem; background-color: #ff9500; color: #0d1117; 
-                  font-weight: bold; text-decoration: none; border-radius: 5px; margin-bottom: 0.5rem;">
-           Sponsor Me
-        </a>
-        <br>
-        <span style="font-size: 0.75rem; color: #58a6ff; font-weight: bold;">Made by Soumya</span>
+        <br>Mode: <span style="color: #ff9500; font-weight: 700;">{"LIVE" if st.session_state.live_mode else "DEMO"}</span>
     </div>
     """, unsafe_allow_html=True)
-
-    # Prediction confidence
-    pred = data.get("prediction", {})
-    pcts = pred.get("percentiles", {})
-    if pcts:
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("""
-        <div style="font-weight: 700; font-size: 0.9rem; color: #8b949e;
-             letter-spacing: 1px; text-transform: uppercase; margin-bottom: 0.5rem;">
-            📊 Score Confidence Interval
-        </div>
-        """, unsafe_allow_html=True)
-
-        current_score = ms.get("score", 0)
-        st.sidebar.markdown(f"""
-        <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: #e6edf3;">
-            10th pct: {current_score + pcts.get('p10', 0):.0f}<br>
-            25th pct: {current_score + pcts.get('p25', 0):.0f}<br>
-            <span style="color: #ff9500; font-weight: 700;">
-            Median: {current_score + pcts.get('p50', 0):.0f}</span><br>
-            75th pct: {current_score + pcts.get('p75', 0):.0f}<br>
-            90th pct: {current_score + pcts.get('p90', 0):.0f}
-        </div>
-        """, unsafe_allow_html=True)
 
 
 # ============================================================================
@@ -1104,14 +1004,13 @@ def main():
     render_sidebar()
 
     # Auto-refresh mechanism (Heartbeat-safe)
-    if st.session_state.auto_refresh:
-        # Reduced to 30s as requested by user
-        wait_time = 30
+    if st.session_state.get('auto_refresh', True):
+        wait_time = 150 if st.session_state.live_mode else 10
         chunk = 5 
         for _ in range(wait_time // chunk):
             time.sleep(chunk)
         
-        st.session_state.dashboard_data = st.session_state.simulator.refresh()
+        st.session_state.dashboard_data = st.session_state.simulator.refresh(use_live=st.session_state.live_mode)
         st.session_state.last_updated = datetime.now().strftime("%H:%M:%S")
         st.session_state.refresh_count += 1
         safe_rerun()
