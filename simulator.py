@@ -356,7 +356,7 @@ class MatchSimulator:
         else:
             # In 2nd innings, India is bowling (defending)
             # 1. Baseline 65% for India (User requested "hardcode to 65-35")
-            india_base = 0.65
+            india_base = 0.70
             
             # 2. Add very small dynamic fluctuation based on RRR and wickets (+/- 5%)
             rrr = self.match_state.required_run_rate
