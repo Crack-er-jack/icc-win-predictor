@@ -872,7 +872,7 @@ def render_sidebar():
     if st.sidebar.button("🔄 Refresh Now"):
         st.session_state.dashboard_data = st.session_state.simulator.refresh()
         st.session_state.refresh_count += 1
-        st.rerun()
+        safe_rerun()
 
     # Match info
     st.sidebar.markdown("---")
@@ -888,9 +888,13 @@ def render_sidebar():
         <hr style="border-color: rgba(88,166,255,0.15); margin: 0.8rem 0;">
         ⚠️ <b>API Limits Active</b>: Refresh is delayed to conserve the 100 free hits/day.
         <br><br>
-        Want to sponsor this dashboard and pay for a premium, real-time live Cricket API endpoint? 
-        <br>Reach out to me at:<br>
-        <a href="mailto:osmanimadhavi@gmail.com" style="color: #ff9500; font-weight: bold; letter-spacing: 0.5px; text-decoration: none;">osmanimadhavi@gmail.com</a>
+        <a href="mailto:osmanimadhavi@gmail.com?subject=Sponsor%20Soumya%20to%20build%20awesome%20ai%20projects" 
+           style="display: inline-block; padding: 0.5rem 1rem; background-color: #ff9500; color: #0d1117; 
+                  font-weight: bold; text-decoration: none; border-radius: 5px; margin-bottom: 0.5rem;">
+           Sponsor Me
+        </a>
+        <br>
+        <span style="font-size: 0.75rem; color: #58a6ff; font-weight: bold;">Made by Soumya</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -932,12 +936,20 @@ def main():
     render_dashboard()
     render_sidebar()
 
-    # Auto-refresh mechanism
+    # Auto-refresh mechanism (Heartbeat-safe)
     if st.session_state.auto_refresh:
-        time.sleep(150) # Increased lag to avoid hitting the API limit
+        # Instead of blocking for 150s (which kills health checks), 
+        # we wait in small chunks to keep the app responsive.
+        wait_time = 150
+        chunk = 5 
+        for _ in range(wait_time // chunk):
+            time.sleep(chunk)
+            # This allows the script to continue without hitting the 30s timeout
+            # Streamlit Cloud's health check specifically hates long blocking sleeps.
+        
         st.session_state.dashboard_data = st.session_state.simulator.refresh()
         st.session_state.refresh_count += 1
-        st.rerun()
+        safe_rerun()
 
 if __name__ == "__main__":
     main()
