@@ -347,18 +347,33 @@ class MatchSimulator:
             # India is bowling in 2nd innings, so their win prob is 'bowling_team_win_prob'
             india_prob = result["bowling_team_win_prob"]
 
-        # Apply starting bias for realism
-        # Add momentum adjustment for "Improved Win Predictor" feel
-        # Positive momentum helps batting team; Negative helps bowling team
-        momentum = self.match_state.get_momentum()
-        momentum_impact = 0.03 * momentum
-        
-        if self.match_state.innings == 1:
-            india_prob += momentum_impact
-        else:
-            # India is bowling, so positive momentum for the batting team (NZ) hurts India
-            india_prob -= momentum_impact
+        # ----------------------------------------------------------------
+        # DYNAMIC SCOREBOARD BIAS (For Real-Time Feel)
+        # ----------------------------------------------------------------
+        # 1. Required Run Rate Bias (Crucial for 2nd innings)
+        if self.match_state.innings == 2:
+            rrr = self.match_state.required_run_rate
+            crr = self.match_state.current_run_rate
             
+            # If RRR is high (>10), bowling team (India) gets a boost
+            if rrr > 10.0:
+                pressure_factor = min(0.35, (rrr - 10.0) * 0.05)
+                india_prob += pressure_factor
+            
+            # Wicket count bias
+            # Every early wicket for the bowling team (India) is huge
+            wicket_impact = self.match_state.wickets * 0.05
+            india_prob += wicket_impact
+            
+            # Momentum adjustment
+            momentum = self.match_state.get_momentum()
+            india_prob -= (0.04 * momentum) # Negative momentum helps India (bowlers)
+        else:
+            # 1st Innings: Basic momentum
+            momentum = self.match_state.get_momentum()
+            india_prob += (0.04 * momentum)
+
+        # Ensure probabilities are realistic (0.01 to 0.99)
         india_prob = float(np.clip(india_prob, 0.01, 0.99))
         
         result["india_win_prob"] = india_prob

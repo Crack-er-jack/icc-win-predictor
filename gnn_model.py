@@ -467,43 +467,58 @@ class OutcomePredictor:
     def _apply_match_context(self, probs: np.ndarray, match_state) -> np.ndarray:
         """
         Apply match-phase adjustments to make predictions more realistic.
-        This accounts for game situations that the untrained model can't capture.
+        T20 Aware: Uses 120-ball percentage for phase detection.
         """
-        overs = len(match_state.ball_history) / 6.0
+        total_balls = match_state.total_balls_bowled
+        phase_pct = total_balls / 120.0
         wickets = match_state.wickets
         rrr = match_state.required_run_rate
         crr = match_state.current_run_rate
 
-        # Death overs adjustment — more boundaries and wickets
-        if overs > 40:
-            probs[4] *= 1.3   # more fours
-            probs[5] *= 1.5   # more sixes
-            probs[6] *= 1.2   # more wickets (risky shots)
-            probs[0] *= 0.7   # fewer dots
+        # Death overs adjustment (last 25% of match)
+        if phase_pct > 0.75:
+            probs[4] *= 1.4   # more fours
+            probs[5] *= 1.6   # more sixes
+            probs[6] *= 1.4   # more wickets (risky shots)
+            probs[0] *= 0.6   # fewer dots
 
-        # Pressure adjustment — high required rate
-        if rrr > crr * 1.3 and overs > 20:
+        # Powerplay adjustment (first 30% of match)
+        elif phase_pct < 0.30:
             probs[4] *= 1.2
-            probs[5] *= 1.4
-            probs[6] *= 1.3  # desperation wickets
-            probs[0] *= 0.8
+            probs[0] *= 0.9
 
-        # New batter adjustment — cautious start
-        striker_stats = match_state.batter_stats.get(match_state.striker)
-        if striker_stats and striker_stats.balls_faced < 10:
-            probs[0] *= 1.3  # more dots
-            probs[1] *= 1.2  # more singles
-            probs[5] *= 0.5  # fewer sixes
-            probs[6] *= 1.2  # vulnerable early
+        # Pressure adjustment — high required rate (CRITICAL for realism)
+        # If RRR is significantly higher than CRR or > 10, batting team is under stress
+        if match_state.innings == 2:
+            if rrr > max(crr * 1.2, 10.0):
+                # Desperation leads to more dots (pressure) and more wickets
+                probs[0] *= 1.2  # More dots due to tight bowling
+                probs[6] *= 1.5  # Much higher wicket risk
+                probs[4] *= 0.8  # Boundaries harder to hit
+                probs[5] *= 1.1  # More six attempts, but risky
+            
+            # Extreme pressure (> 14 RPO)
+            if rrr > 14.0:
+                probs[6] *= 2.0  # Wicket fest
+                probs[0] *= 1.3
+                probs[4] *= 0.6
 
         # Tail-ender adjustment
         if wickets >= 7:
-            probs[0] *= 1.3
-            probs[6] *= 1.5
-            probs[5] *= 0.6
+            probs[0] *= 1.4
+            probs[6] *= 1.6
+            probs[5] *= 0.5
+            probs[4] *= 0.7
+
+        # New batter adjustment
+        striker_stats = match_state.batter_stats.get(match_state.striker)
+        if striker_stats and striker_stats.balls_faced < 6:
+            probs[0] *= 1.2
+            probs[6] *= 1.3
+            probs[4] *= 0.7
 
         # Re-normalize
-        probs = np.clip(probs, 0.01, None)  # floor at 1%
+        probs = np.clip(probs, 0.005, None)
         probs = probs / probs.sum()
 
         return probs
