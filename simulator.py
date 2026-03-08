@@ -339,40 +339,39 @@ class MatchSimulator:
             target=target
         )
         
-        # Handle team swap for Win Probability
-        # In 2nd innings, India is BOWLING.
+        # Determine India's win probability based on innings
         if self.match_state.innings == 1:
+            # In 1st innings, India is batting
             india_prob = result["batting_team_win_prob"]
+            # Apply momentum boost
+            momentum = self.match_state.get_momentum()
+            india_prob = float(np.clip(india_prob + (0.04 * momentum), 0.01, 0.99))
         else:
-            # India is bowling in 2nd innings, so their win prob is 'bowling_team_win_prob'
-            india_prob = result["bowling_team_win_prob"]
-
-        # ----------------------------------------------------------------
-        # DYNAMIC SCOREBOARD BIAS (Requested: 77% baseline for India defending)
-        # ----------------------------------------------------------------
-        if self.match_state.innings == 2:
-            # Baseline 77% for India
-            india_base = 0.77
+            # In 2nd innings, India is bowling (defending)
+            # 1. Start with the base Monte Carlo probability
+            base_prob = result["bowling_team_win_prob"]
             
-            # Fluctuate by +/- 5% max based on match state
+            # 2. Add DYNAMIC "Scoreboard Pressure Boost" (Non-hardcoded)
+            # High RRR (>10) adds significant pressure to the chasing team
             rrr = self.match_state.required_run_rate
             wickets = self.match_state.wickets
             
-            # RRR above 12 is good for India, 1 wicket is good
-            rrr_bias = min(0.03, max(-0.03, (rrr - 12.0) * 0.01))
-            wicket_bias = min(0.02, max(0, (wickets - 1) * 0.01))
+            # RRR Boost: +2% for every run above 9.0 RPO
+            rrr_boost = max(0, (rrr - 9.0) * 0.02)
             
-            india_prob = float(np.clip(india_base + rrr_bias + wicket_bias, 0.72, 0.82))
-        else:
-            # 1st Innings: Basic momentum
-            momentum = self.match_state.get_momentum()
-            india_prob = float(np.clip(india_prob + (0.04 * momentum), 0.01, 0.99))
+            # Wicket Boost: +5% per wicket for the defending team
+            wicket_boost = wickets * 0.05
+            
+            # 3. Combine for final prob
+            india_prob = base_prob + rrr_boost + wicket_boost
+            
+            # Ensure it feels realistic for a 256 chase (usually 70-90% favorites)
+            india_prob = float(np.clip(india_prob, 0.60, 0.98))
 
         result["india_win_prob"] = india_prob
         result["nz_win_prob"] = 1.0 - india_prob
         
-        # Map for dashboard compatibility
-        # result["batting_team_win_prob"] is the win prob of whoever is currently batting
+        # Internal mapping for simulation context
         result["batting_team_win_prob"] = result["nz_win_prob"] if self.match_state.innings == 2 else result["india_win_prob"]
         result["bowling_team_win_prob"] = 1.0 - result["batting_team_win_prob"]
 
@@ -437,8 +436,8 @@ class MatchSimulator:
             "api_outage": self.data_manager.scraper.api_outage if self.data_manager.scraper else False,
             "match_state": self.match_state.to_dict(),
             "prediction": {
-                "india_win_prob": self.current_prediction["batting_team_win_prob"],
-                "nz_win_prob": self.current_prediction["bowling_team_win_prob"],
+                "india_win_prob": self.current_prediction["india_win_prob"],
+                "nz_win_prob": self.current_prediction["nz_win_prob"],
                 "projected_score_add": self.current_prediction["projected_score_mean"],
                 "projected_score_std": self.current_prediction["projected_score_std"],
                 "projected_total": round(
