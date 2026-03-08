@@ -30,6 +30,20 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from simulator import MatchSimulator
 
 # ============================================================================
+# Helper Functions
+# ============================================================================
+
+def safe_rerun():
+    """Execute a rerun safely across different Streamlit versions."""
+    try:
+        st.rerun()
+    except (AttributeError, RuntimeError):
+        try:
+            st.experimental_rerun()
+        except (AttributeError, RuntimeError):
+            pass  # Fallback for environments where rerun is not supported
+
+# ============================================================================
 # Page Configuration
 # ============================================================================
 
@@ -763,7 +777,7 @@ def render_dashboard():
 
     # Win Probability Gauge
     gauge_fig = create_win_probability_gauge(india_wp, nz_wp)
-    st.plotly_chart(gauge_fig, use_container_width=True, key="gauge")
+    st.plotly_chart(gauge_fig, width="stretch", key="gauge")
 
     # Final Score Predictor Alert Box
     if "show_predictor" not in st.session_state:
