@@ -729,6 +729,9 @@ def render_dashboard():
     </div>
     """, unsafe_allow_html=True)
 
+    if data.get("api_outage", False):
+        st.warning("⚠️ **API Connection Issue** — Showing last cached match data. Please wait for the system to reconnect...")
+
     ms = data.get("match_state", {})
     pred = data.get("prediction", {})
 

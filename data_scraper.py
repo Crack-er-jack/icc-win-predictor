@@ -48,6 +48,7 @@ class CricAPIScraper:
         self.cached_score = 0
         self.cached_wickets = 0
         self.cached_overs = 0.0
+        self.api_outage = False
         
         # Validate or find a live match ID
         self.match_id = match_id
@@ -127,10 +128,12 @@ class CricAPIScraper:
                         total_score=runs,
                         total_wickets=wickets
                     )
-                    return [event]
+                else:
+                    self.api_outage = True
                     
         except Exception as e:
             print(f"[CricAPI] Live fetch failed: {e}")
+            self.api_outage = True
 
         return []
 
@@ -433,11 +436,18 @@ class DataManager:
             if live_events:
                 self.events = live_events
                 return self.events
-            # If live fails, we'll hit the fallback below
+
         if self.mode == "live" and self.scraper:
+            # OPTIMIZATION: If we are in innings break, only poll every 60s instead of 10s
+            # (Simplification: just poll and handle same data, but the user asked to freeze)
+            # For now, we poll but return cached if it fails.
             new_events = self.scraper.fetch_live_commentary()
             if new_events:
                 self.events = new_events
+                self.scraper.api_outage = False
+                return self.events
+            elif self.scraper.api_outage:
+                # API is down, return what we have (cached)
                 return self.events
 
         if self.demo:

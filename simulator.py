@@ -395,6 +395,7 @@ class MatchSimulator:
         return {
             "status": "live",
             "mode": self.data_manager.mode,
+            "api_outage": self.data_manager.scraper.api_outage if self.data_manager.scraper else False,
             "match_state": self.match_state.to_dict(),
             "prediction": {
                 "india_win_prob": self.current_prediction["batting_team_win_prob"],
