@@ -40,10 +40,9 @@ class CricAPIScraper:
     Uses Streamlit secrets for API key management.
     """
     def __init__(self, match_id: Optional[str] = None):
-        self.API_KEY = st.secrets.get("CRICAPI_KEY", "")
-        if not self.API_KEY:
-            print("[CricAPI] WARNING: CRICAPI_KEY missing from secrets!")
-            
+        # HARDCODED API KEY (User requested)
+        self.API_KEY = "13b9db17-5641-4558-a3d4-344c2b199dcc"
+        
         self.session = requests.Session()
         self.cached_score = 0
         self.cached_wickets = 0
@@ -57,6 +56,9 @@ class CricAPIScraper:
             if r.status_code == 200:
                 matches = r.json().get("data", [])
                 
+                # DEBUG: Log match names found
+                print(f"[CricAPI] Matches found: {[m.get('name') for m in matches]}")
+                
                 # If we have a match ID, ensure it's valid
                 if self.match_id:
                     valid = any(m["id"] == self.match_id for m in matches)
@@ -65,14 +67,21 @@ class CricAPIScraper:
                 
                 # If no match ID or it was invalid, pick the first one with a live score
                 if not self.match_id:
-                    with_score = [m for m in matches if m.get("score")]
-                    if with_score:
-                        # Prioritize IND vs NZ match
-                        ind_nz = [m for m in with_score if "India" in m.get("name", "") and "New Zealand" in m.get("name", "")]
+                    # Filter for active matches (those having a score field)
+                    active_matches = [m for m in matches if m.get("score") or m.get("matchStarted")]
+                    
+                    if active_matches:
+                        # Prioritize IND vs NZ match (Case-insensitive)
+                        ind_nz = [m for m in active_matches if "india" in m.get("name", "").lower() and ("zealand" in m.get("name", "").lower() or "nz" in m.get("name", "").lower())]
+                        
                         if ind_nz:
                             self.match_id = ind_nz[0]["id"]
+                            print(f"[CricAPI] Selected IND-NZ Match ID: {self.match_id}")
                         else:
-                            self.match_id = with_score[0]["id"]
+                            self.match_id = active_matches[0]["id"]
+                            print(f"[CricAPI] Fallback to first active match ID: {self.match_id}")
+            else:
+                print(f"[CricAPI] Failed to fetch matches: Status {r.status_code}")
         except Exception as e:
             print(f"[CricAPI] Error finding match: {e}")
 
@@ -86,7 +95,11 @@ class CricAPIScraper:
             response = self.session.get(url, timeout=10)
             if response.status_code == 200:
                 data = response.json()
+                
+                # DEBUG: Inspect the raw score structure
                 score_data = data.get("data", {}).get("score", [])
+                print(f"[CricAPI] Raw Score Data for {self.match_id}: {score_data}")
+                
                 if not score_data:
                     return []
                 # Detect which innings is active
@@ -293,7 +306,7 @@ class DataManager:
         self.match_id = match_id
         self.demo_mode = demo_mode
         self.target = target
-        self.scraper = CricAPIScraper(match_id) if match_id else None
+        self.scraper = CricAPIScraper(match_id)
         
         # FORCE LIVE MODE (User requested)
         self.mode = "live"
