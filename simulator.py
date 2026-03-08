@@ -349,23 +349,23 @@ class MatchSimulator:
             rrr_bias = np.clip((rrr - 9.0) * 0.01, 0, 0.10)
             wicket_bias = np.clip(wickets * 0.015, 0, 0.08)
             
-            # 3. Match Maturity Factor (Uncertainty modeling)
+            # 3. Match Maturity Factor (Refined for Accuracy)
             # Pulls probability toward 50/50 when many balls are left
             total_balls = 120
             balls_left = self.match_state.balls_remaining
             maturity = np.clip((total_balls - balls_left) / total_balls, 0, 1)
             
-            # Confidence grows as match matures (power 1.5 keeps it conservative)
-            confidence = maturity ** 1.5
+            # Confidence grows as match matures (power 1.1 is more reactive than 1.5)
+            confidence = maturity ** 1.1
             
-            # Raw probability with global -15% "under-dog" adjustment
-            raw_prob = base_prob + rrr_bias + wicket_bias - 0.15
+            # Raw probability with global -5% adjustment (Less aggressive shift)
+            raw_prob = base_prob + rrr_bias + wicket_bias - 0.05
             
             # BLEND: (Model * Confidence) + (Neutral * (1-Confidence))
             blended_prob = (raw_prob * confidence) + (0.5 * (1.0 - confidence))
             
-            # 4. Final cap at 85% for India
-            india_prob = float(np.clip(blended_prob, 0.01, 0.85))
+            # 4. Final cap at 92% for India
+            india_prob = float(np.clip(blended_prob, 0.01, 0.92))
 
         result["india_win_prob"] = india_prob
         result["nz_win_prob"] = 1.0 - india_prob

@@ -96,9 +96,7 @@ class CricAPIScraper:
             if response.status_code == 200:
                 data = response.json()
                 
-                # DEBUG: Inspect the raw score structure
                 score_data = data.get("data", {}).get("score", [])
-                print(f"[CricAPI] Raw Score Data for {self.match_id}: {score_data}")
                 
                 if not score_data:
                     return []
