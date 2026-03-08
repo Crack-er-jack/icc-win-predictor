@@ -213,8 +213,10 @@ class MatchSimulator:
         print(f"  ✓ Data Manager ({self.data_manager.mode} mode)")
 
         # Match state
-        self.match_state = MatchState(target=target)
-        print(f"  ✓ Match State (target: {target})")
+        # FORCE 256 for the live match as requested by user
+        final_target = target if target > 0 else 256
+        self.match_state = MatchState(target=final_target)
+        print(f"  ✓ Match State (target: {final_target})")
 
         # GNN predictor
         self.predictor = OutcomePredictor()
@@ -238,12 +240,13 @@ class MatchSimulator:
         if all_events:
             self.match_state.update_from_ball_events(all_events)
             
-        # FORCE 2nd innings if demo and target is set
-        if self.data_manager.is_demo() and self.match_state.target > 0:
+        # FORCE 2nd innings for the live India vs NZ chase
+        if self.match_state.target > 0:
             self.match_state.innings = 2
             self.match_state.batting_team = "New Zealand"
             self.match_state.bowling_team = "India"
-            self.match_state.first_innings_score = self.match_state.target - 1
+            self.match_state.first_innings_score = 255
+            self.match_state._compute_derived_stats()
             self._run_prediction()
 
         print(f"\n  🏁 System ready! Mode: {self.data_manager.mode.upper()}")
@@ -262,6 +265,21 @@ class MatchSimulator:
 
         # Step 2: Update match state
         self.match_state.update_from_ball_events(events)
+        
+        # PERSIST target and innings for the live NZ chase
+        if self.match_state.target == 0:
+            self.match_state.target = 256
+            self.match_state.first_innings_score = 255
+            self.match_state.innings = 2
+            self.match_state.batting_team = "New Zealand"
+            self.match_state.bowling_team = "India"
+            self.match_state._compute_derived_stats()
+
+                #         commentary += f" [TARGET: {detected_target}]"
+        self._run_prediction()
+
+        # Step 6: Run What If analysis
+        self.what_if_results = self.what_if.run_all_scenarios(self.match_state)
 
         # Check if innings is over
         if self.match_state.is_innings_complete():
@@ -330,14 +348,21 @@ class MatchSimulator:
             india_prob = result["bowling_team_win_prob"]
 
         # Apply starting bias for realism
-        overs = self.match_state.total_balls_bowled / 6.0
-        if overs < 2.0 and self.match_state.innings == 1:
-            india_base = 0.52
-            weight = max(0, (2.0 - overs) / 2.0)
-            india_prob = (india_prob * (1 - weight)) + (india_base * weight)
-
-        result["india_win_prob"] = float(india_prob)
-        result["nz_win_prob"] = float(1.0 - india_prob)
+        # Add momentum adjustment for "Improved Win Predictor" feel
+        # Positive momentum helps batting team; Negative helps bowling team
+        momentum = self.match_state.get_momentum()
+        momentum_impact = 0.03 * momentum
+        
+        if self.match_state.innings == 1:
+            india_prob += momentum_impact
+        else:
+            # India is bowling, so positive momentum for the batting team (NZ) hurts India
+            india_prob -= momentum_impact
+            
+        india_prob = float(np.clip(india_prob, 0.01, 0.99))
+        
+        result["india_win_prob"] = india_prob
+        result["nz_win_prob"] = 1.0 - india_prob
         
         # Map for dashboard compatibility
         # result["batting_team_win_prob"] is the win prob of whoever is currently batting

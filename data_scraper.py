@@ -94,16 +94,20 @@ class CricAPIScraper:
                 current_inning = score_data[-1] 
                 inning_name = current_inning.get("inning", "")
                 
-                # Check if we transitioned to 2nd innings
+                # Detect target during 2nd innings chase
                 is_second_innings = len(score_data) > 1 or "2nd Inning" in inning_name
+                detected_target = 0
+                if is_second_innings and len(score_data) > 1:
+                    first_inn = score_data[0]
+                    detected_target = int(first_inn.get("r", 0)) + 1
                 
                 runs = current_inning.get("r", 0)
                 wickets = current_inning.get("w", 0)
                 overs = float(current_inning.get("o", 0.0))
                 
                 # Only return an event if the score or over advanced
-                if runs > self.cached_score or wickets > self.cached_wickets or overs > self.cached_overs:
-                    run_diff = max(0, runs - self.cached_score)
+                if runs > self.cached_score or wickets > self.cached_wickets or overs > self.cached_overs or (is_second_innings and self.cached_score == 0):
+                    run_diff = max(0, runs - self.cached_score) if not (is_second_innings and self.cached_score == 0) else runs
                     is_wicket = wickets > self.cached_wickets
                     
                     self.cached_score = runs
@@ -111,6 +115,8 @@ class CricAPIScraper:
                     self.cached_overs = overs
                     
                     commentary = f"Live Update: {inning_name} - {runs}/{wickets} ({overs} ov)"
+                    if detected_target > 0:
+                        commentary += f" [TARGET: {detected_target}]"
                     if is_wicket:
                         commentary = f"WICKET! {inning_name} score is now {runs}/{wickets}."
                     
@@ -285,30 +291,30 @@ class DemoMatchSimulator:
 class DataManager:
     def __init__(self, match_id: Optional[str] = None, demo_mode: bool = True, target: int = 256):
         self.match_start_time = datetime(2026, 3, 8, 19, 0, 0)
-        if match_id and (not demo_mode or datetime.now() >= self.match_start_time):
-            self.mode = "live"
-        else:
-            self.mode = "demo"
-
         self.match_id = match_id
         self.demo_mode = demo_mode
         self.target = target
         self.scraper = CricAPIScraper(match_id) if match_id else None
+        
+        # Determine mode: prioritize live if match_id or demo_mode=False
+        if (match_id or not demo_mode) and datetime.now() >= self.match_start_time:
+            self.mode = "live"
+        else:
+            self.mode = "demo"
+        
         self.demo = DemoMatchSimulator(target=target) if self.mode == "demo" else None
         self.events: List[BallEvent] = []
 
         if self.mode == "live" and self.scraper:
-            if not self.scraper.match_id:
+            # Try to get data once, if it fails but demo_mode=False, we STAY in live mode 
+            # and just show an outage warning instead of reverting to demo.
+            live_events = self.scraper.fetch_live_commentary()
+            if live_events: 
+                self.events = live_events
+            elif not self.scraper.match_id and demo_mode: # Only revert if demo allowed
                  self.mode = "demo"
                  self.demo = DemoMatchSimulator(target=self.target)
                  self.events = self.demo.get_all_events()
-            else:
-                 live_events = self.scraper.fetch_live_commentary()
-                 if live_events: self.events = live_events
-                 elif self.scraper.cached_score == 0 and self.scraper.cached_wickets == 0:
-                     self.mode = "demo"
-                     self.demo = DemoMatchSimulator(target=self.target)
-                     self.events = self.demo.get_all_events()
         
         if self.mode == "demo" and self.demo:
             self.events = self.demo.get_all_events()

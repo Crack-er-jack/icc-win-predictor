@@ -366,8 +366,9 @@ def apply_custom_styles():
 def init_session_state():
     """Initialize Streamlit session state on first load."""
     if "simulator" not in st.session_state:
+        # Use None for match_id to let the scraper find the India vs NZ match automatically
         st.session_state.simulator = MatchSimulator(
-            match_id="b8833e89-6997-4e95-a647-5ee3a99c5510", demo_mode=False, target=0, n_simulations=10000
+            match_id=None, demo_mode=False, target=256, n_simulations=10000
         )
     if "dashboard_data" not in st.session_state:
         st.session_state.dashboard_data = st.session_state.simulator.refresh()
@@ -720,14 +721,14 @@ def render_dashboard():
         else '<span class="live-badge">🔴 LIVE</span>'
 
     st.markdown(f"""
-    <div style="text-align: center; margin-bottom: 0.5rem;">
-        <span style="font-family: 'Inter'; font-weight: 900; font-size: 1.6rem;
-              letter-spacing: -0.5px; color: #e6edf3;">
-            🏏 ICC Win Predictor
-        </span>
-        &nbsp;&nbsp;{badge}
-    </div>
-    """, unsafe_allow_html=True)
+<div style="text-align: center; margin-bottom: 0.5rem;">
+    <span style="font-family: 'Inter'; font-weight: 900; font-size: 1.6rem;
+          letter-spacing: -0.5px; color: #e6edf3;">
+        🏏 ICC Win Predictor
+    </span>
+    &nbsp;&nbsp;{badge}
+</div>
+""", unsafe_allow_html=True)
 
     if data.get("api_outage", False):
         st.warning("⚠️ **API Connection Issue** — Showing last cached match data. Please wait for the system to reconnect...")
@@ -744,83 +745,87 @@ def render_dashboard():
     first_inn_score = ms.get('first_innings_score', 0)
     innings_num = ms.get('innings', 1)
     
+    # FAILSAFE: Hardcode India vs NZ 2nd Innings Target (User requested)
+    if target <= 1:
+        target = 256
+        ms['target'] = 256
+    if first_inn_score == 0:
+        first_inn_score = 255
+        ms['first_innings_score'] = 255
+    if innings_num == 1 or ms.get('batting_team') == 'India':
+        innings_num = 2
+        ms['innings'] = 2
+        ms['batting_team'] = "New Zealand"
+        ms['bowling_team'] = "India"
+        ms['runs_remaining'] = max(0, target - ms.get('score', 0))
+    
     if is_break:
         banner_content = f"""
-        <div class="score-banner" style="border-color: #ff9500; background: linear-gradient(145deg, #161b22 0%, #2a1b0a 100%);">
-            <div style="font-size: 0.9rem; color: #ff9500; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 0.5rem;">
-                ⏸️ INNINGS BREAK - MATCH PAUSED
-            </div>
-            <div style="display: flex; justify-content: center; align-items: center; gap: 2rem;">
-                <div style="text-align: right;">
-                    <div style="font-size: 0.8rem; color: #8b949e;">🇮🇳 INDIA (1st Inn)</div>
-                    <div style="font-size: 2.2rem; font-weight: 800; color: #e6edf3;">{ms.get('score', 0)}/{ms.get('wickets', 0)}</div>
-                    <div style="font-size: 0.9rem; color: #8b949e;">({ms.get('overs', '0.0')} ov)</div>
-                </div>
-                <div style="font-size: 1.5rem; color: #444; font-weight: 900;">VS</div>
-                <div style="text-align: left;">
-                    <div style="font-size: 0.8rem; color: #8b949e;">🇳🇿 NEW ZEALAND</div>
-                    <div style="font-size: 2.2rem; font-weight: 800; color: #58a6ff;">TARGET {ms.get('score', 0) + 1}</div>
-                    <div style="font-size: 0.9rem; color: #8b949e;">Req RR: {((ms.get('score', 0) + 1) / 20):.2f}</div>
-                </div>
-            </div>
-            <div style="margin-top: 1rem; font-size: 0.85rem; color: #8b949e; font-style: italic;">
-                The simulation is frozen during the ads break. Rebooting for 2nd innings soon...
-            </div>
+<div class="score-banner" style="border-color: #ff9500; background: linear-gradient(145deg, #161b22 0%, #2a1b0a 100%);">
+    <div style="font-size: 0.9rem; color: #ff9500; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 0.5rem;">
+        ⏸️ INNINGS BREAK - MATCH PAUSED
+    </div>
+    <div style="display: flex; justify-content: center; align-items: center; gap: 2rem;">
+        <div style="text-align: right;">
+            <div style="font-size: 0.8rem; color: #8b949e;">🇮🇳 INDIA (1st Inn)</div>
+            <div style="font-size: 2.2rem; font-weight: 800; color: #e6edf3;">{ms.get('score', 0)}/{ms.get('wickets', 0)}</div>
+            <div style="font-size: 0.9rem; color: #8b949e;">({ms.get('overs', '0.0')} ov)</div>
         </div>
-        """
+        <div style="font-size: 1.5rem; color: #444; font-weight: 900;">VS</div>
+        <div style="text-align: left;">
+            <div style="font-size: 0.8rem; color: #8b949e;">🇳🇿 NEW ZEALAND</div>
+            <div style="font-size: 2.2rem; font-weight: 800; color: #58a6ff;">TARGET {ms.get('score', 0) + 1}</div>
+            <div style="font-size: 0.9rem; color: #8b949e;">Req RR: {((ms.get('score', 0) + 1) / 20):.2f}</div>
+        </div>
+    </div>
+    <div style="margin-top: 1rem; font-size: 0.85rem; color: #8b949e; font-style: italic;">
+        The simulation is frozen during the ads break. Rebooting for 2nd innings soon...
+    </div>
+</div>
+"""
     else:
         # Standard Live Banner
         innings_num = ms.get('innings', 2) 
         batting_team = ms.get('batting_team', 'New Zealand' if innings_num == 2 else 'India')
         
-        # India Score Blob (Small Pill)
-        india_blob = ""
+        # 1. India Score Blob (Simple & Reliable)
         if innings_num == 2:
-            india_blob = f"""
-            <div style="display: flex; justify-content: center; margin-bottom: 0.5rem;">
-                <span style="background: rgba(255, 107, 0, 0.2); color: #ff9500; 
-                      padding: 2.5px 14px; border-radius: 20px; font-size: 0.85rem; 
-                      font-weight: 700; border: 1px solid rgba(255, 107, 0, 0.4);
-                      box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
-                    🇮🇳 IND: {first_inn_score}/5 (Innings Closed)
-                </span>
-            </div>
-            """
-        
-        # Chase logic
-        info_text = f"({ms.get('overs', '0.0')} overs)"
-        if innings_num == 2:
-            runs_needed = ms.get('runs_remaining', 0)
-            balls_left = ms.get('balls_remaining', 0)
-            chase_text = f"NZ need {runs_needed} runs in {balls_left} balls"
-            score_color = "linear-gradient(135deg, #58a6ff, #1f6feb)" # NZ Blue Gradient
-            status_text = "New Zealand is Batting"
-        else:
-            chase_text = "Build a huge total!"
-            score_color = "linear-gradient(135deg, #ff6b00, #ff9500)" # India Orange Gradient
-            status_text = f"{batting_team} is Batting"
+            st.markdown(f"""
+<div style="text-align: center; margin-bottom: 0.8rem;">
+    <span style="background: rgba(255, 107, 0, 0.15); color: #ff9500; 
+          padding: 4px 16px; border-radius: 20px; font-size: 0.9rem; 
+          font-weight: 800; border: 1px solid rgba(255, 107, 0, 0.3);">
+        🇮🇳 INDIA: {first_inn_score}/5 (Innings Closed)
+    </span>
+</div>
+""", unsafe_allow_html=True)
 
-        banner_content = f"""
-        <div class="score-banner">
-            {india_blob}
-            <div style="font-size: 0.9rem; color: #8b949e; font-weight: 700;
-                 letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 0.4rem;">
-                {status_text} &nbsp;•&nbsp; {f"{innings_num}nd Innings" if innings_num > 1 else "1st Innings"}
-            </div>
-            <div class="score" style="background: {score_color}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1.1;">
-                {ms.get('score', 0)}/{ms.get('wickets', 0)}
-            </div>
-            <div class="info" style="margin-top: 0.2rem;">
-                <span style="font-family: 'JetBrains Mono'; font-size: 1.25rem; font-weight: 600; color: #e6edf3;">
-                    {info_text}
-                </span>
-            </div>
-            <div class="target" style="margin-top: 0.6rem; color: #58a6ff; font-size: 1.05rem; letter-spacing: 0.3px;">
-                {chase_text} &nbsp;•&nbsp; <span style="color: #8b949e;">CRR: {ms.get('current_run_rate', 0)}</span>
-            </div>
-        </div>
-        """
-        st.markdown(banner_content, unsafe_allow_html=True)
+        # 2. Main Score Metrics (Streamlit Native = Reliable)
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col1:
+            st.metric(label=f"🇳🇿 {batting_team}", value=f"{ms.get('score', 0)}/{ms.get('wickets', 0)}")
+        with col2:
+            st.metric(label="Overs", value=f"{ms.get('overs', '0.0')}")
+        with col3:
+            if innings_num == 2:
+                balls_left = ms.get('balls_remaining', 120)
+                st.metric(label="Runs Needed", value=f"{ms.get('runs_remaining', target)}", delta=f"{balls_left} balls left", delta_color="normal")
+            else:
+                st.metric(label="CRR", value=f"{ms.get('current_run_rate', 0)}")
+
+        # 3. Dynamic Status Banner
+        runs_needed = ms.get('runs_remaining', 0)
+        balls_left = ms.get('balls_remaining', 0)
+        chase_text = f"NZ NEED {runs_needed} RUNS IN {balls_left} BALLS" if innings_num == 2 else "BUILDING A HUGE TOTAL"
+        
+        st.markdown(f"""
+<div style="background: rgba(88, 166, 255, 0.1); border-radius: 8px; padding: 12px; 
+            text-align: center; border: 1px solid rgba(88, 166, 255, 0.2); margin-top: 10px;">
+    <span style="color: #58a6ff; font-weight: 800; font-size: 1.1rem; letter-spacing: 1px;">
+        ⚡ {chase_text}
+    </span>
+</div>
+""", unsafe_allow_html=True)
 
     # ---- WIN PROBABILITY SECTION ----
     india_wp = pred.get("india_win_prob", 0.5)
