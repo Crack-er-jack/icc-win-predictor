@@ -348,25 +348,17 @@ class MatchSimulator:
             india_prob = float(np.clip(india_prob + (0.04 * momentum), 0.01, 0.99))
         else:
             # In 2nd innings, India is bowling (defending)
-            # 1. Start with the base Monte Carlo probability
-            base_prob = result["bowling_team_win_prob"]
+            # 1. Baseline 65% for India (User requested "hardcode to 65-35")
+            india_base = 0.65
             
-            # 2. Add DYNAMIC "Scoreboard Pressure Boost" (Non-hardcoded)
-            # High RRR (>10) adds significant pressure to the chasing team
+            # 2. Add very small dynamic fluctuation based on RRR and wickets (+/- 5%)
             rrr = self.match_state.required_run_rate
             wickets = self.match_state.wickets
             
-            # RRR Boost: +2% for every run above 9.0 RPO
-            rrr_boost = max(0, (rrr - 9.0) * 0.02)
+            rrr_bias = np.clip((rrr - 12.0) * 0.005, -0.05, 0.05)
+            wicket_bias = np.clip(wickets * 0.01, 0, 0.05)
             
-            # Wicket Boost: +5% per wicket for the defending team
-            wicket_boost = wickets * 0.05
-            
-            # 3. Combine for final prob
-            india_prob = base_prob + rrr_boost + wicket_boost
-            
-            # Ensure it feels realistic for a 256 chase (usually 70-90% favorites)
-            india_prob = float(np.clip(india_prob, 0.60, 0.98))
+            india_prob = float(np.clip(india_base + rrr_bias + wicket_bias, 0.60, 0.70))
 
         result["india_win_prob"] = india_prob
         result["nz_win_prob"] = 1.0 - india_prob

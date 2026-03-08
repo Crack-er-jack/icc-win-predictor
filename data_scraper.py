@@ -296,11 +296,8 @@ class DataManager:
         self.target = target
         self.scraper = CricAPIScraper(match_id) if match_id else None
         
-        # Determine mode: prioritize live if match_id or demo_mode=False
-        if (match_id or not demo_mode) and datetime.now() >= self.match_start_time:
-            self.mode = "live"
-        else:
-            self.mode = "demo"
+        # FORCE LIVE MODE (User requested)
+        self.mode = "live"
         
         self.demo = DemoMatchSimulator(target=target) if self.mode == "demo" else None
         self.events: List[BallEvent] = []
@@ -311,10 +308,11 @@ class DataManager:
             live_events = self.scraper.fetch_live_commentary()
             if live_events: 
                 self.events = live_events
-            elif not self.scraper.match_id and demo_mode: # Only revert if demo allowed
-                 self.mode = "demo"
-                 self.demo = DemoMatchSimulator(target=self.target)
-                 self.events = self.demo.get_all_events()
+            elif not self.scraper.match_id and demo_mode: # Only revert    # FORCE LIVE BADGE
+                badge = '<span class="live-badge">🔴 LIVE</span>'
+                self.mode = "demo" # This line was implicitly removed by the instruction, adding it back for syntactical correctness
+                self.demo = DemoMatchSimulator(target=self.target)
+                self.events = self.demo.get_all_events()
         
         if self.mode == "demo" and self.demo:
             self.events = self.demo.get_all_events()
