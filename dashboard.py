@@ -743,24 +743,12 @@ def render_dashboard():
     first_inn_score = ms.get('first_innings_score', 0)
     innings_num = ms.get('innings', 1)
     
-    # FAILSAFE: Hardcode India vs NZ 2nd Innings (User requested 70/4)
-    if target <= 1 or target == 256:
-        target = 256
-        ms['target'] = 256
-        ms['first_innings_score'] = 255
-        # Force NZ 70/4
-        if ms.get('score', 0) < 70:
-            ms['score'] = 70
-            ms['wickets'] = 4
-            ms['overs'] = "10.0"
-            ms['balls_remaining'] = 60 # 10 overs left
-            ms['runs_remaining'] = 186 # 256 - 70
+    # SCORE BANNER FAILSAFE (Removed hardcode)
+    if first_inn_score == 0 and target > 0:
+        first_inn_score = target - 1
+        ms['first_innings_score'] = first_inn_score
     
-    if first_inn_score == 0:
-        first_inn_score = 255
-        ms['first_innings_score'] = 255
-        
-    if innings_num == 1 or ms.get('batting_team') == 'India':
+    if innings_num == 1 and target > 0:
         innings_num = 2
         ms['innings'] = 2
         ms['batting_team'] = "New Zealand"

@@ -63,17 +63,13 @@ class MatchState:
 
     def __post_init__(self):
         """Force 2nd innings state if target is provided (e.g., NZ Chase)."""
-        # Hardcode India vs NZ 2nd Innings state
-        if self.target == 256:
+        if self.target > 0 and self.innings == 1:
             self.innings = 2
             self.batting_team = "New Zealand"
             self.bowling_team = "India"
-            self.first_innings_score = 255
-            # User requested 70/4 for now
-            self.score = 70
-            self.wickets = 4
-            self.overs_completed = 10 # Estimate 10 overs for 70 runs
-            self.balls_in_current_over = 0
+            # Ensure first_innings_score is set
+            if self.first_innings_score == 0 and self.target > 0:
+                self.first_innings_score = self.target - 1
             
         self._compute_derived_stats()
 

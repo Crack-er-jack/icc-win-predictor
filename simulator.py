@@ -240,17 +240,9 @@ class MatchSimulator:
         if all_events:
             self.match_state.update_from_ball_events(all_events)
             
-        # FORCE 70/4 for the live India vs NZ chase as requested
-        if self.match_state.target == 256:
-            self.match_state.innings = 2
-            self.match_state.batting_team = "New Zealand"
-            self.match_state.bowling_team = "India"
-            self.match_state.first_innings_score = 255
-            self.match_state.score = 70
-            self.match_state.wickets = 4
-            self.match_state.overs_completed = 10
-            self.match_state._compute_derived_stats()
-            self._run_prediction()
+        # Restore dynamic behavior: No forced score here
+        self.match_state._compute_derived_stats()
+        self._run_prediction()
 
         print(f"\n  🏁 System ready! Mode: {self.data_manager.mode.upper()}")
         print("=" * 60)
@@ -269,18 +261,11 @@ class MatchSimulator:
         # Step 2: Update match state
         self.match_state.update_from_ball_events(events)
         
-        # PERSIST target and innings for the live NZ chase (Hardcode 70/4)
-        if self.match_state.target == 256 or self.match_state.target == 0:
-            self.match_state.target = 256
-            self.match_state.first_innings_score = 255
-            self.match_state.innings = 2
-            self.match_state.batting_team = "New Zealand"
-            self.match_state.bowling_team = "India"
-            # FORCE 70/4 for New Zealand correctly
-            self.match_state.score = 72
-            self.match_state.wickets = 5
-            self.match_state.overs_completed = 8
-            self.match_state._compute_derived_stats()
+        # PERSIST target and innings naturally
+        if self.match_state.target == 0 and self.data_manager.scraper:
+            # Let the scraper or match state handle detection
+            pass
+        self.match_state._compute_derived_stats()
 
                 #         commentary += f" [TARGET: {detected_target}]"
         self._run_prediction()
@@ -355,17 +340,18 @@ class MatchSimulator:
             india_prob = float(np.clip(india_prob + (0.04 * momentum), 0.01, 0.99))
         else:
             # In 2nd innings, India is bowling (defending)
-            # 1. Baseline 65% for India (User requested "hardcode to 65-35")
-            india_base = 0.70
+            # 1. Start with the base Monte Carlo probability
+            base_prob = result["bowling_team_win_prob"]
             
-            # 2. Add very small dynamic fluctuation based on RRR and wickets (+/- 5%)
+            # 2. Add dynamic bias only (No hardcoded constant)
             rrr = self.match_state.required_run_rate
             wickets = self.match_state.wickets
             
-            rrr_bias = np.clip((rrr - 12.0) * 0.005, -0.05, 0.05)
-            wicket_bias = np.clip(wickets * 0.01, 0, 0.05)
+            # Simple scoreboard pressure: Higher RRR = higher win prob for India
+            rrr_bias = np.clip((rrr - 9.0) * 0.02, 0, 0.20)
+            wicket_bias = np.clip(wickets * 0.03, 0, 0.15)
             
-            india_prob = float(np.clip(india_base + rrr_bias + wicket_bias, 0.60, 0.70))
+            india_prob = float(np.clip(base_prob + rrr_bias + wicket_bias, 0.01, 0.99))
 
         result["india_win_prob"] = india_prob
         result["nz_win_prob"] = 1.0 - india_prob
