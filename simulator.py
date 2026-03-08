@@ -343,17 +343,29 @@ class MatchSimulator:
             # 1. Start with the base Monte Carlo probability
             base_prob = result["bowling_team_win_prob"]
             
-            # 2. Add dynamic bias only (Dampened per user request)
+            # 2. Add dynamic bias (Ultra-conservative multipliers)
             rrr = self.match_state.required_run_rate
             wickets = self.match_state.wickets
+            rrr_bias = np.clip((rrr - 9.0) * 0.01, 0, 0.10)
+            wicket_bias = np.clip(wickets * 0.015, 0, 0.08)
             
-            # Dampened scoreboard pressure: Higher RRR = higher win prob for India
-            # Reduced multipliers: 0.02 -> 0.015, 0.03 -> 0.02
-            rrr_bias = np.clip((rrr - 9.0) * 0.015, 0, 0.15)
-            wicket_bias = np.clip(wickets * 0.02, 0, 0.12)
+            # 3. Match Maturity Factor (Uncertainty modeling)
+            # Pulls probability toward 50/50 when many balls are left
+            total_balls = 120
+            balls_left = self.match_state.balls_remaining
+            maturity = np.clip((total_balls - balls_left) / total_balls, 0, 1)
             
-            # Apply a global 10% "under-dog" adjustment and cap at 94%
-            india_prob = float(np.clip(base_prob + rrr_bias + wicket_bias - 0.10, 0.01, 0.94))
+            # Confidence grows as match matures (power 1.5 keeps it conservative)
+            confidence = maturity ** 1.5
+            
+            # Raw probability with global -15% "under-dog" adjustment
+            raw_prob = base_prob + rrr_bias + wicket_bias - 0.15
+            
+            # BLEND: (Model * Confidence) + (Neutral * (1-Confidence))
+            blended_prob = (raw_prob * confidence) + (0.5 * (1.0 - confidence))
+            
+            # 4. Final cap at 85% for India
+            india_prob = float(np.clip(blended_prob, 0.01, 0.85))
 
         result["india_win_prob"] = india_prob
         result["nz_win_prob"] = 1.0 - india_prob
