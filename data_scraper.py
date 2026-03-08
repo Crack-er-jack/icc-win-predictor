@@ -41,7 +41,7 @@ class CricAPIScraper:
     """
     def __init__(self, match_id: Optional[str] = None):
         # HARDCODED API KEY (User requested)
-        self.API_KEY = "13b9db17-5641-4558-a3d4-344c2b199dcc"
+        self.API_KEY = "4f9c6e5d-239a-4020-8a53-d94fb0475d19"
         
         self.session = requests.Session()
         self.cached_score = 0
