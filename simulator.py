@@ -343,15 +343,17 @@ class MatchSimulator:
             # 1. Start with the base Monte Carlo probability
             base_prob = result["bowling_team_win_prob"]
             
-            # 2. Add dynamic bias only (No hardcoded constant)
+            # 2. Add dynamic bias only (Dampened per user request)
             rrr = self.match_state.required_run_rate
             wickets = self.match_state.wickets
             
-            # Simple scoreboard pressure: Higher RRR = higher win prob for India
-            rrr_bias = np.clip((rrr - 9.0) * 0.02, 0, 0.20)
-            wicket_bias = np.clip(wickets * 0.03, 0, 0.15)
+            # Dampened scoreboard pressure: Higher RRR = higher win prob for India
+            # Reduced multipliers: 0.02 -> 0.015, 0.03 -> 0.02
+            rrr_bias = np.clip((rrr - 9.0) * 0.015, 0, 0.15)
+            wicket_bias = np.clip(wickets * 0.02, 0, 0.12)
             
-            india_prob = float(np.clip(base_prob + rrr_bias + wicket_bias, 0.01, 0.99))
+            # Apply a global 10% "under-dog" adjustment and cap at 94%
+            india_prob = float(np.clip(base_prob + rrr_bias + wicket_bias - 0.10, 0.01, 0.94))
 
         result["india_win_prob"] = india_prob
         result["nz_win_prob"] = 1.0 - india_prob
