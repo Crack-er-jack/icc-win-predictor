@@ -35,13 +35,14 @@ from simulator import MatchSimulator
 
 def safe_rerun():
     """Execute a rerun safely across different Streamlit versions."""
+    import streamlit as st
     try:
         st.rerun()
     except (AttributeError, RuntimeError):
         try:
             st.experimental_rerun()
-        except (AttributeError, RuntimeError):
-            pass  # Fallback for environments where rerun is not supported
+        except:
+            pass
 
 # ============================================================================
 # Page Configuration
