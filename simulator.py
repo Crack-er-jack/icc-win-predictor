@@ -258,14 +258,23 @@ class MatchSimulator:
 
         # Check if innings is over
         if self.match_state.is_innings_complete():
-            result = self.match_state.get_result()
-            return {
-                "status": "completed",
-                "result": result,
-                "match_state": self.match_state.to_dict(),
-                "history": self._get_history_data(),
-                "final_prediction": self.current_prediction
-            }
+            if self.match_state.innings == 1:
+                # Innings Break - India finished 1st innings
+                # We should still run prediction for the match outcome
+                self._run_prediction()
+                data = self._compile_dashboard_data()
+                data["status"] = "innings_break"
+                return data
+            else:
+                # 2nd Innings Over - Match Finished
+                result = self.match_state.get_result()
+                return {
+                    "status": "completed",
+                    "result": result,
+                    "match_state": self.match_state.to_dict(),
+                    "history": self._get_history_data(),
+                    "final_prediction": self.current_prediction
+                }
 
         # Step 3-5: Run prediction pipeline
         self._run_prediction()
@@ -279,28 +288,54 @@ class MatchSimulator:
         """Run GNN + Monte Carlo prediction pipeline."""
         # GNN prediction
         self.current_probs = self.predictor.predict(self.match_state)
-
+        
+        # Determine simulation parameters
+        balls_left = self.match_state.balls_remaining
+        wickets_left = self.match_state.wickets_left
+        runs_left = self.match_state.runs_remaining
+        target = self.match_state.target
+        
+        # Special Case: Innings Break (1st Innings Over)
+        # We need to simulate the FULL 2nd innings chase to get a win prob
+        if self.match_state.is_innings_complete() and self.match_state.innings == 1:
+            balls_left = 120
+            wickets_left = 10
+            runs_left = self.match_state.score + 1
+            target = runs_left
+            # For 2nd innings start, we can use a slightly more aggressive profile
+            # or keep current GNN probs if they are representative
+        
         # Monte Carlo simulation
         result = self.mc_simulator.simulate(
             self.current_probs,
-            balls_remaining=self.match_state.balls_remaining,
-            wickets_remaining=self.match_state.wickets_left,
-            runs_remaining=self.match_state.runs_remaining,
-            target=self.match_state.target
+            balls_remaining=balls_left,
+            wickets_remaining=wickets_left,
+            runs_remaining=runs_left,
+            target=target
         )
+        
+        # Handle team swap for Win Probability
+        # If we are in 1st innings (or break), 'batting_team_win_prob' is India's win prob
+        # if India is batting (which they are).
+        if self.match_state.innings == 1:
+            india_prob = result["batting_team_win_prob"]
+        else:
+            # India is bowling in 2nd innings, so win prob is 'bowling_team_win_prob'
+            india_prob = result["bowling_team_win_prob"]
 
-        # Apply starting bias for realism (User request: base case of past matches)
-        # If match has just started, bias towards India (slight favorites)
-        overs = len(self.match_state.ball_history) / 6.0
-        if overs < 2.0:
-            # India pre-match favoritism (approx 52%)
+        # Apply starting bias for realism
+        overs = self.match_state.total_balls_bowled / 6.0
+        if overs < 2.0 and self.match_state.innings == 1:
             india_base = 0.52
             weight = max(0, (2.0 - overs) / 2.0)
-            result["batting_team_win_prob"] = (
-                result["batting_team_win_prob"] * (1 - weight) +
-                india_base * weight
-            )
-            result["bowling_team_win_prob"] = 1.0 - result["batting_team_win_prob"]
+            india_prob = (india_prob * (1 - weight)) + (india_base * weight)
+
+        result["india_win_prob"] = float(india_prob)
+        result["nz_win_prob"] = float(1.0 - india_prob)
+        
+        # Map for dashboard compatibility
+        result["batting_team_win_prob"] = result["india_win_prob"] if self.match_state.innings == 1 else result["nz_win_prob"]
+        result["bowling_team_win_prob"] = 1.0 - result["batting_team_win_prob"]
 
         self.current_prediction = result
 

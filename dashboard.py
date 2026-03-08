@@ -732,27 +732,62 @@ def render_dashboard():
     ms = data.get("match_state", {})
     pred = data.get("prediction", {})
 
+    status = data.get("status", "live")
+    is_break = status == "innings_break"
+    target = ms.get('target', 0)
+    
     # ---- SCORE BANNER ----
-    st.markdown(f"""
-    <div class="score-banner">
-        <div style="font-size: 0.85rem; color: #8b949e; font-weight: 600;
-             letter-spacing: 1px; text-transform: uppercase;">
-            {ms.get('batting_team', 'India')} vs {ms.get('bowling_team', 'New Zealand')}
-              &nbsp;•&nbsp; 1st Innings
+    if is_break:
+        banner_content = f"""
+        <div class="score-banner" style="border-color: #ff9500; background: linear-gradient(145deg, #161b22 0%, #2a1b0a 100%);">
+            <div style="font-size: 0.9rem; color: #ff9500; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 0.5rem;">
+                ⏸️ INNINGS BREAK - MATCH PAUSED
+            </div>
+            <div style="display: flex; justify-content: center; align-items: center; gap: 2rem;">
+                <div style="text-align: right;">
+                    <div style="font-size: 0.8rem; color: #8b949e;">🇮🇳 INDIA (1st Inn)</div>
+                    <div style="font-size: 2.2rem; font-weight: 800; color: #e6edf3;">{ms.get('score', 0)}/{ms.get('wickets', 0)}</div>
+                    <div style="font-size: 0.9rem; color: #8b949e;">({ms.get('overs', '0.0')} ov)</div>
+                </div>
+                <div style="font-size: 1.5rem; color: #444; font-weight: 900;">VS</div>
+                <div style="text-align: left;">
+                    <div style="font-size: 0.8rem; color: #8b949e;">🇳🇿 NEW ZEALAND</div>
+                    <div style="font-size: 2.2rem; font-weight: 800; color: #58a6ff;">TARGET {ms.get('score', 0) + 1}</div>
+                    <div style="font-size: 0.9rem; color: #8b949e;">Req RR: {((ms.get('score', 0) + 1) / 20):.2f}</div>
+                </div>
+            </div>
+            <div style="margin-top: 1rem; font-size: 0.85rem; color: #8b949e; font-style: italic;">
+                The simulation is frozen during the ads break. Rebooting for 2nd innings soon...
+            </div>
         </div>
-        <div class="score">
-            {ms.get('score', 0)}/{ms.get('wickets', 0)}
+        """
+    else:
+        # Standard Live Banner
+        innings_text = "1st Innings" if ms.get('innings', 1) == 1 else "2nd Innings"
+        target_text = f"Target: {target}" if target > 0 else "Build a huge total!"
+        
+        banner_content = f"""
+        <div class="score-banner">
+            <div style="font-size: 0.85rem; color: #8b949e; font-weight: 600;
+                 letter-spacing: 1px; text-transform: uppercase;">
+                {ms.get('batting_team', 'India')} vs {ms.get('bowling_team', 'New Zealand')}
+                  &nbsp;•&nbsp; {innings_text}
+            </div>
+            <div class="score">
+                {ms.get('score', 0)}/{ms.get('wickets', 0)}
+            </div>
+            <div class="info">
+                <span style="font-family: 'JetBrains Mono'; font-size: 1.1rem;">
+                    ({ms.get('overs', '0.0')} overs)
+                </span>
+            </div>
+            <div class="target" style="margin-top: 0.3rem;">
+                {target_text} &nbsp;•&nbsp; CRR: {ms.get('current_run_rate', 0)}
+            </div>
         </div>
-        <div class="info">
-            <span style="font-family: 'JetBrains Mono'; font-size: 1.1rem;">
-                ({ms.get('overs', '0.0')} overs)
-            </span>
-        </div>
-        <div class="target" style="margin-top: 0.3rem;">
-            Build a huge total! &nbsp;•&nbsp; CRR: {ms.get('current_run_rate', 0)}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """
+    
+    st.markdown(banner_content, unsafe_allow_html=True)
 
     # ---- WIN PROBABILITY SECTION ----
     india_wp = pred.get("india_win_prob", 0.5)
@@ -822,9 +857,11 @@ def render_dashboard():
         </div>""", unsafe_allow_html=True)
     with stat_cols[2]:
         projected = pred.get("projected_total", 0)
+        label = "Projected Score" if not is_break else "Target"
+        val = f"~{projected}" if not is_break else f"{ms.get('score', 0) + 1}"
         st.markdown(f"""<div class="stat-card">
-            <div class="stat-value">~{projected}</div>
-            <div class="stat-label">Projected Score</div>
+            <div class="stat-value">{val}</div>
+            <div class="stat-label">{label}</div>
         </div>""", unsafe_allow_html=True)
     with stat_cols[3]:
         momentum = data.get("momentum", 0)

@@ -188,7 +188,7 @@ class MatchState:
 
         if self.innings == 2 and self.target > 0:
             self.runs_remaining = max(self.target - self.score, 0)
-            remaining_overs = max(120 - total_balls, 0) / 6.0
+            remaining_overs = max(120 - effective_balls, 0) / 6.0
             self.required_run_rate = (
                 round(self.runs_remaining / remaining_overs, 2)
                 if remaining_overs > 0 else 999.99
