@@ -298,51 +298,23 @@ class DataManager:
         
         # FORCE LIVE MODE (User requested)
         self.mode = "live"
-        
-        self.demo = DemoMatchSimulator(target=target) if self.mode == "demo" else None
+        self.demo = None
         self.events: List[BallEvent] = []
 
-        if self.mode == "live" and self.scraper:
-            # Try to get data once, if it fails but demo_mode=False, we STAY in live mode 
-            # and just show an outage warning instead of reverting to demo.
+        if self.scraper:
             live_events = self.scraper.fetch_live_commentary()
             if live_events: 
                 self.events = live_events
-            elif not self.scraper.match_id and demo_mode: # Only revert    # FORCE LIVE BADGE
-                badge = '<span class="live-badge">🔴 LIVE</span>'
-                self.mode = "demo" # This line was implicitly removed by the instruction, adding it back for syntactical correctness
-                self.demo = DemoMatchSimulator(target=self.target)
-                self.events = self.demo.get_all_events()
         
-        if self.mode == "demo" and self.demo:
-            self.events = self.demo.get_all_events()
-
     def refresh(self) -> List[BallEvent]:
-        if self.mode == "demo" and self.match_id and datetime.now() >= self.match_start_time:
-            self.mode = "live"
-            self.scraper = CricAPIScraper(self.match_id)
-            live_events = self.scraper.fetch_live_commentary()
-            if live_events:
-                self.events = live_events
-                return self.events
-
-        if self.mode == "live" and self.scraper:
+        # Always stay in live mode
+        if self.scraper:
             new_events = self.scraper.fetch_live_commentary()
             if new_events:
                 # IMPORTANT: Append to history, don't overwrite!
                 self.events.extend(new_events)
                 self.scraper.api_outage = False
                 return self.events
-            elif self.scraper.api_outage:
-                return self.events
-
-        if self.demo:
-            num_new = random.randint(1, 3)
-            for _ in range(num_new):
-                ball = self.demo.get_next_ball()
-                if ball is None: break
-            self.events = self.demo.get_all_events()
-
         return self.events
 
     def get_all_events(self) -> List[BallEvent]:

@@ -716,9 +716,7 @@ def render_dashboard():
     data = st.session_state.dashboard_data
 
     # ---- HEADER ----
-    mode = data.get("mode", "demo")
-    badge = '<span class="demo-badge">⚡ DEMO MODE</span>' if mode == "demo" \
-        else '<span class="live-badge">🔴 LIVE</span>'
+    badge = '<span class="live-badge">🔴 LIVE</span>'
 
     st.markdown(f"""
 <div style="text-align: center; margin-bottom: 0.5rem;">
