@@ -357,6 +357,8 @@ def init_session_state():
         st.session_state.dashboard_data = st.session_state.simulator.refresh()
     if "refresh_count" not in st.session_state:
         st.session_state.refresh_count = 0
+    if "last_updated" not in st.session_state:
+        st.session_state.last_updated = datetime.now().strftime("%H:%M:%S")
     if "auto_refresh" not in st.session_state:
         st.session_state.auto_refresh = True
 
@@ -871,6 +873,7 @@ def render_sidebar():
     # Manual refresh button
     if st.sidebar.button("🔄 Refresh Now"):
         st.session_state.dashboard_data = st.session_state.simulator.refresh()
+        st.session_state.last_updated = datetime.now().strftime("%H:%M:%S")
         st.session_state.refresh_count += 1
         safe_rerun()
 
@@ -883,8 +886,9 @@ def render_sidebar():
         <br>Striker: <span style="color: #ff9500; font-weight: 600;">{ms.get('striker', '—')}</span>
         <br>Bowler: <span style="color: #3fb950; font-weight: 600;">{ms.get('bowler', '—')}</span>
         <br><br>
-        Refreshes: {st.session_state.refresh_count}
+        Refreshes: {st.session_state.refresh_count} (Last: {st.session_state.last_updated})
         <br>10,000 Monte Carlo sims/cycle
+        <br><i style="font-size: 0.7rem; color: #58a6ff;">Probabilities fluctuate slightly per sim due to MC variance.</i>
         <hr style="border-color: rgba(88,166,255,0.15); margin: 0.8rem 0;">
         ⚠️ <b>API Limits Active</b>: Refresh is delayed to conserve the 100 free hits/day.
         <br><br>
@@ -944,10 +948,9 @@ def main():
         chunk = 5 
         for _ in range(wait_time // chunk):
             time.sleep(chunk)
-            # This allows the script to continue without hitting the 30s timeout
-            # Streamlit Cloud's health check specifically hates long blocking sleeps.
         
         st.session_state.dashboard_data = st.session_state.simulator.refresh()
+        st.session_state.last_updated = datetime.now().strftime("%H:%M:%S")
         st.session_state.refresh_count += 1
         safe_rerun()
 
