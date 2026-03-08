@@ -774,10 +774,20 @@ def render_dashboard():
         base_score = ms.get("score", 0)
         low = base_score + pcts.get("p10", 0)
         high = base_score + pcts.get("p90", 0)
+        crr_proj = pred.get("crr_projection", 0)
+        mom_proj = pred.get("momentum_projection", 0)
         
         col_alert, col_close = st.columns([0.9, 0.1])
         with col_alert:
-            st.success(f"🎯 **Final Score Predictor**: Based on 10,000 simulations, the 1st innings total is **80% likely** to finish between **{low:.0f}** and **{high:.0f}**.")
+            st.success(f"""
+            🎯 **Final Score Predictor (Hybrid)**
+            
+            - **AI Predicted (80% Prob):** {low:.0f} — {high:.0f}
+            - **Standard CRR Projection:** {crr_proj}
+            - **Recent Momentum Trend:** {mom_proj}
+            
+            *The AI model accounts for match pressure and death-over probabilities, while CRR/Momentum show raw current pace.*
+            """)
         with col_close:
             if st.button("✕", help="Close Predictor"):
                 st.session_state.show_predictor = False

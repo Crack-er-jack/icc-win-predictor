@@ -321,6 +321,23 @@ class MatchSimulator:
 
     def _compile_dashboard_data(self) -> Dict:
         """Compile all data needed by the dashboard into a single dictionary."""
+        # Heuristic Projections
+        score = self.match_state.score
+        balls_bowled = len(self.match_state.ball_history)
+        overs = balls_bowled / 6.0 if balls_bowled > 0 else 0.1
+        crr = score / overs
+        
+        # Simple CRR projection for 20 overs
+        crr_proj = round(crr * 20)
+        
+        # Momentum based (using last 2 overs if available)
+        recent_rr = crr
+        if len(self.match_state.recent_overs) >= 1:
+            recent_rr = sum(self.match_state.recent_overs[-2:]) / min(len(self.match_state.recent_overs), 2)
+        
+        balls_left = max(120 - balls_bowled, 0)
+        mom_proj = round(score + (recent_rr * (balls_left / 6.0)))
+
         # Player impact: batter contributions normalized
         player_impact = {}
         for name, stats in self.match_state.batter_stats.items():
@@ -355,6 +372,8 @@ class MatchSimulator:
                     self.match_state.score +
                     self.current_prediction["projected_score_mean"]
                 ),
+                "crr_projection": crr_proj,
+                "momentum_projection": mom_proj,
                 "percentiles": self.current_prediction.get("percentiles", {}),
                 "score_distribution": self.current_prediction.get("score_distribution", []).tolist() if isinstance(self.current_prediction.get("score_distribution"), np.ndarray) else [],
                 "simulation_time": self.current_prediction.get("simulation_time", 0),
