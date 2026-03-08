@@ -240,12 +240,15 @@ class MatchSimulator:
         if all_events:
             self.match_state.update_from_ball_events(all_events)
             
-        # FORCE 2nd innings for the live India vs NZ chase
-        if self.match_state.target > 0:
+        # FORCE 70/4 for the live India vs NZ chase as requested
+        if self.match_state.target == 256:
             self.match_state.innings = 2
             self.match_state.batting_team = "New Zealand"
             self.match_state.bowling_team = "India"
             self.match_state.first_innings_score = 255
+            self.match_state.score = 70
+            self.match_state.wickets = 4
+            self.match_state.overs_completed = 10
             self.match_state._compute_derived_stats()
             self._run_prediction()
 
@@ -266,13 +269,17 @@ class MatchSimulator:
         # Step 2: Update match state
         self.match_state.update_from_ball_events(events)
         
-        # PERSIST target and innings for the live NZ chase
-        if self.match_state.target == 0:
+        # PERSIST target and innings for the live NZ chase (Hardcode 70/4)
+        if self.match_state.target == 256 or self.match_state.target == 0:
             self.match_state.target = 256
             self.match_state.first_innings_score = 255
             self.match_state.innings = 2
             self.match_state.batting_team = "New Zealand"
             self.match_state.bowling_team = "India"
+            # FORCE 70/4 for New Zealand correctly
+            self.match_state.score = 70
+            self.match_state.wickets = 4
+            self.match_state.overs_completed = 10
             self.match_state._compute_derived_stats()
 
                 #         commentary += f" [TARGET: {detected_target}]"
