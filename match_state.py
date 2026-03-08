@@ -51,8 +51,8 @@ class MatchState:
     # Core match info
     batting_team: str = "India"
     bowling_team: str = "New Zealand"
-    innings: int = 2  # We focus on the chase (2nd innings)
-    target: int = 268
+    innings: int = 1  # 1st innings
+    target: int = 0   # No target yet
 
     # Current score state
     score: int = 0
@@ -61,17 +61,17 @@ class MatchState:
     balls_in_current_over: int = 0
 
     # Derived chase metrics
-    runs_remaining: int = 268
-    balls_remaining: int = 300  # 50 overs × 6 balls
+    runs_remaining: int = 0
+    balls_remaining: int = 120  # 20 overs × 6 balls for T20
     wickets_left: int = 10
 
     # Run rates
     current_run_rate: float = 0.0
-    required_run_rate: float = 5.36  # target / 50
+    required_run_rate: float = 0.0
 
     # Current players on field
     striker: str = "Rohit Sharma"
-    non_striker: str = "Shubman Gill"
+    non_striker: str = "Yashasvi Jaiswal"
     bowler: str = "Trent Boult"
 
     # Ball-by-ball history
@@ -171,20 +171,23 @@ class MatchState:
 
         overs_decimal = total_balls / 6.0
 
-        self.runs_remaining = max(self.target - self.score, 0)
-        self.balls_remaining = max(300 - total_balls, 0)
+        if self.innings == 2 and self.target > 0:
+            self.runs_remaining = max(self.target - self.score, 0)
+            remaining_overs = max(120 - total_balls, 0) / 6.0
+            self.required_run_rate = (
+                round(self.runs_remaining / remaining_overs, 2)
+                if remaining_overs > 0 else 999.99
+            )
+        else:
+            self.runs_remaining = 0
+            self.required_run_rate = 0.0
+
+        self.balls_remaining = max(120 - total_balls, 0)
         self.wickets_left = max(10 - self.wickets, 0)
 
         # Current run rate
         self.current_run_rate = (
             round(self.score / overs_decimal, 2) if overs_decimal > 0 else 0.0
-        )
-
-        # Required run rate
-        remaining_overs = self.balls_remaining / 6.0
-        self.required_run_rate = (
-            round(self.runs_remaining / remaining_overs, 2)
-            if remaining_overs > 0 else 999.99
         )
 
     def get_momentum(self, last_n_overs: int = 2) -> float:
@@ -238,16 +241,19 @@ class MatchState:
 
     def is_innings_complete(self) -> bool:
         """Check if the innings is over."""
+        if self.innings == 2 and self.target > 0 and self.score >= self.target:
+            return True
         return (
             self.wickets >= 10 or
-            self.balls_remaining <= 0 or
-            self.score >= self.target
+            self.balls_remaining <= 0
         )
 
     def get_result(self) -> Optional[str]:
         """Get match result if innings is complete."""
         if not self.is_innings_complete():
             return None
+        if self.innings == 1:
+            return f"Innings Break. Target for {self.bowling_team} is {self.score + 1}"
         if self.score >= self.target:
             return f"{self.batting_team} win by {self.wickets_left} wickets!"
         elif self.wickets >= 10 or self.balls_remaining <= 0:

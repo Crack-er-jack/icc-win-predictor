@@ -14,6 +14,7 @@ import json
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict
 from datetime import datetime
+import streamlit as st
 
 
 @dataclass
@@ -33,118 +34,105 @@ class BallEvent:
     total_wickets: int   # total wickets fallen
 
 
-class ESPNCricInfoScraper:
+class CricAPIScraper:
     """
-    Scrapes ball-by-ball data from ESPN Cricinfo match commentary.
-    Uses the JSON API endpoint when available, falls back to HTML parsing.
+    Fetches live data from CricAPI instead of scraping ESPN.
+    Uses Streamlit secrets for API key management.
     """
-
-    BASE_URL = "https://www.espncricinfo.com"
-    COMMENTARY_API = "https://hs-consumer-api.espncricinfo.com/v1/pages/match/comments"
-
     def __init__(self, match_id: Optional[str] = None):
-        self.match_id = match_id
+        self.API_KEY = st.secrets.get("CRICAPI_KEY", "")
+        if not self.API_KEY:
+            print("[CricAPI] WARNING: CRICAPI_KEY missing from secrets!")
+            
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            )
-        })
-        self.cached_events: List[BallEvent] = []
+        self.cached_score = 0
+        self.cached_wickets = 0
+        self.cached_overs = 0.0
+        
+        # Validate or find a live match ID
+        self.match_id = match_id
+        try:
+            r = self.session.get(f"https://api.cricapi.com/v1/currentMatches?apikey={self.API_KEY}", timeout=10)
+            if r.status_code == 200:
+                matches = r.json().get("data", [])
+                
+                # If we have a match ID, ensure it's valid
+                if self.match_id:
+                    valid = any(m["id"] == self.match_id for m in matches)
+                    if not valid:
+                        self.match_id = None
+                
+                # If no match ID or it was invalid, pick the first one with a live score
+                if not self.match_id:
+                    with_score = [m for m in matches if m.get("score")]
+                    if with_score:
+                        # Prioritize IND vs NZ match
+                        ind_nz = [m for m in with_score if "India" in m.get("name", "") and "New Zealand" in m.get("name", "")]
+                        if ind_nz:
+                            self.match_id = ind_nz[0]["id"]
+                        else:
+                            self.match_id = with_score[0]["id"]
+        except Exception as e:
+            print(f"[CricAPI] Error finding match: {e}")
 
     def fetch_live_commentary(self) -> List[BallEvent]:
-        """
-        Attempt to fetch live commentary from ESPN Cricinfo.
-        Returns list of BallEvent objects or empty list on failure.
-        """
+        """Fetch the latest score from CricAPI and create a synthetic event for the app."""
         if not self.match_id:
             return []
 
         try:
-            # Try the JSON API first
-            url = f"{self.COMMENTARY_API}?matchId={self.match_id}&inningNumber=2&commentType=ALL&sortDirection=DESC&fromInningOver=-1"
+            url = f"https://api.cricapi.com/v1/match_info?apikey={self.API_KEY}&offset=0&id={self.match_id}"
             response = self.session.get(url, timeout=10)
-
             if response.status_code == 200:
                 data = response.json()
-                return self._parse_api_response(data)
+                score_data = data.get("data", {}).get("score", [])
+                if not score_data:
+                    return []
+                
+                # Try to get India's innings score, fallback to the latest
+                india_score = next((s for s in score_data if "India" in s.get("inning", "")), None)
+                if not india_score:
+                    india_score = score_data[0]
+                
+                runs = india_score.get("r", 0)
+                wickets = india_score.get("w", 0)
+                overs = float(india_score.get("o", 0.0))
+                
+                # Only return an event if the score or over advanced
+                if runs > self.cached_score or wickets > self.cached_wickets or overs > self.cached_overs:
+                    run_diff = max(0, runs - self.cached_score)
+                    is_wicket = wickets > self.cached_wickets
+                    
+                    self.cached_score = runs
+                    self.cached_wickets = wickets
+                    self.cached_overs = overs
+                    
+                    commentary = f"Live Update: Score pushes to {runs}/{wickets} after {overs} overs."
+                    if is_wicket:
+                        commentary = f"WICKET! Big moment. Score is now {runs}/{wickets}."
+                    elif run_diff > 0:
+                        commentary = f"{run_diff} runs added to the total. Score: {runs}/{wickets}."
 
-            # Fallback: scrape the HTML commentary page
-            html_url = f"{self.BASE_URL}/series/match/{self.match_id}/full-scorecard"
-            response = self.session.get(html_url, timeout=10)
-            if response.status_code == 200:
-                return self._parse_html_commentary(response.text)
-
-        except (requests.RequestException, json.JSONDecodeError, KeyError) as e:
-            print(f"[Scraper] Live fetch failed: {e}")
+                    event = BallEvent(
+                        over=overs,
+                        runs=run_diff,
+                        extras=0,
+                        is_wicket=is_wicket,
+                        is_boundary=run_diff in [4, 6],
+                        is_six=(run_diff == 6),
+                        batter="Batter",
+                        bowler="Bowler",
+                        non_striker="?",
+                        commentary=commentary,
+                        total_score=runs,
+                        total_wickets=wickets
+                    )
+                    return [event]
+                    
+        except Exception as e:
+            print(f"[CricAPI] Live fetch failed: {e}")
 
         return []
-
-    def _parse_api_response(self, data: dict) -> List[BallEvent]:
-        """Parse the ESPN Cricinfo JSON API response into BallEvent objects."""
-        events = []
-        comments = data.get("comments", [])
-
-        for comment in comments:
-            try:
-                over_num = comment.get("overNumber", 0)
-                ball_num = comment.get("ballNumber", 0)
-                over = over_num + (ball_num / 10.0)
-
-                innings_runs = comment.get("inningsRuns", 0)
-                innings_wickets = comment.get("inningsWickets", 0)
-                runs = comment.get("batsmanRuns", 0)
-                extras = comment.get("extras", 0)
-                is_wicket = comment.get("isWicket", False)
-
-                batsman = comment.get("batsmanName", "Unknown")
-                bowler_name = comment.get("bowlerName", "Unknown")
-                non_striker = comment.get("nonStrikerName", "Unknown")
-                text = comment.get("text", "")
-
-                event = BallEvent(
-                    over=over,
-                    runs=runs,
-                    extras=extras,
-                    is_wicket=is_wicket,
-                    is_boundary=(runs == 4 or runs == 6),
-                    is_six=(runs == 6),
-                    batter=batsman,
-                    bowler=bowler_name,
-                    non_striker=non_striker,
-                    commentary=text,
-                    total_score=innings_runs,
-                    total_wickets=innings_wickets
-                )
-                events.append(event)
-            except (KeyError, TypeError):
-                continue
-
-        return list(reversed(events))  # chronological order
-
-    def _parse_html_commentary(self, html: str) -> List[BallEvent]:
-        """Fallback HTML parser for commentary page."""
-        soup = BeautifulSoup(html, "html.parser")
-        events = []
-        # This is a simplified parser — ESPN's HTML structure changes frequently
-        commentary_items = soup.find_all("div", class_="commentary-item")
-
-        for item in commentary_items:
-            try:
-                text = item.get_text(strip=True)
-                # Basic heuristic parsing
-                events.append(BallEvent(
-                    over=0.0, runs=0, extras=0, is_wicket=False,
-                    is_boundary=False, is_six=False,
-                    batter="Unknown", bowler="Unknown", non_striker="Unknown",
-                    commentary=text, total_score=0, total_wickets=0
-                ))
-            except Exception:
-                continue
-
-        return events
 
 
 class DemoMatchSimulator:
@@ -406,21 +394,29 @@ class DataManager:
         self.demo_mode = demo_mode
         self.target = target
 
-        self.scraper = ESPNCricInfoScraper(match_id) if match_id else None
+        self.scraper = CricAPIScraper(match_id) if match_id else None
         self.demo = DemoMatchSimulator(target=target) if self.mode == "demo" else None
 
         self.events: List[BallEvent] = []
 
         # Initialize with current events
         if self.mode == "live" and self.scraper:
-            live_events = self.scraper.fetch_live_commentary()
-            if live_events:
-                self.events = live_events
+            if not self.scraper.match_id:
+                 # API didn't return any live matches at all
+                 self.mode = "demo"
+                 self.demo = DemoMatchSimulator(target=self.target)
+                 self.events = self.demo.get_all_events()
             else:
-                # Fallback to demo if live fetch fails even at match time
-                self.mode = "demo"
-                self.demo = DemoMatchSimulator(target=target)
-                self.events = self.demo.get_all_events()
+                 live_events = self.scraper.fetch_live_commentary()
+                 if live_events:
+                     self.events = live_events
+                 elif self.scraper.cached_score == 0 and self.scraper.cached_wickets == 0:
+                     # Live fetch returned nothing and score is 0, fallback to demo
+                     self.mode = "demo"
+                     self.demo = DemoMatchSimulator(target=self.target)
+                     self.events = self.demo.get_all_events()
+                 else:
+                     self.events = []
         
         if self.mode == "demo" and self.demo:
             self.events = self.demo.get_all_events()
@@ -431,7 +427,7 @@ class DataManager:
         if self.mode == "demo" and self.match_id and datetime.now() >= self.match_start_time:
             print("[DataManager] Auto-switching to Live Mode! Match has started.")
             self.mode = "live"
-            self.scraper = ESPNCricInfoScraper(self.match_id)
+            self.scraper = CricAPIScraper(self.match_id)
             # Fetch live events
             live_events = self.scraper.fetch_live_commentary()
             if live_events:

@@ -351,7 +351,7 @@ def init_session_state():
     """Initialize Streamlit session state on first load."""
     if "simulator" not in st.session_state:
         st.session_state.simulator = MatchSimulator(
-            demo_mode=True, target=268, n_simulations=10000
+            match_id="b8833e89-6997-4e95-a647-5ee3a99c5510", demo_mode=False, target=0, n_simulations=10000
         )
     if "dashboard_data" not in st.session_state:
         st.session_state.dashboard_data = st.session_state.simulator.refresh()
@@ -672,7 +672,7 @@ def render_dashboard():
         <div style="font-size: 0.85rem; color: #8b949e; font-weight: 600;
              letter-spacing: 1px; text-transform: uppercase;">
             {ms.get('batting_team', 'India')} vs {ms.get('bowling_team', 'New Zealand')}
-              &nbsp;•&nbsp; 2nd Innings
+              &nbsp;•&nbsp; 1st Innings
         </div>
         <div class="score">
             {ms.get('score', 0)}/{ms.get('wickets', 0)}
@@ -683,8 +683,7 @@ def render_dashboard():
             </span>
         </div>
         <div class="target" style="margin-top: 0.3rem;">
-            Need {ms.get('runs_remaining', 0)} off {ms.get('balls_remaining', 0)} balls
-            &nbsp;•&nbsp; RRR: {ms.get('required_run_rate', 0)}
+            Build a huge total! &nbsp;•&nbsp; CRR: {ms.get('current_run_rate', 0)}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -724,8 +723,8 @@ def render_dashboard():
         </div>""", unsafe_allow_html=True)
     with stat_cols[1]:
         st.markdown(f"""<div class="stat-card">
-            <div class="stat-value">{ms.get('required_run_rate', 0)}</div>
-            <div class="stat-label">Required RR</div>
+            <div class="stat-value">{ms.get('balls_remaining', 0)}</div>
+            <div class="stat-label">Balls Left</div>
         </div>""", unsafe_allow_html=True)
     with stat_cols[2]:
         projected = pred.get("projected_total", 0)
@@ -865,12 +864,12 @@ def render_sidebar():
     """, unsafe_allow_html=True)
 
     # Auto-refresh toggle
-    st.session_state.auto_refresh = st.sidebar.toggle(
-        "Auto-Refresh (10s)", value=st.session_state.auto_refresh
+    st.session_state.auto_refresh = st.sidebar.checkbox(
+        "Auto-Refresh (150s lag)", value=st.session_state.auto_refresh
     )
 
     # Manual refresh button
-    if st.sidebar.button("🔄 Refresh Now", width="stretch"):
+    if st.sidebar.button("🔄 Refresh Now"):
         st.session_state.dashboard_data = st.session_state.simulator.refresh()
         st.session_state.refresh_count += 1
         st.rerun()
@@ -886,6 +885,12 @@ def render_sidebar():
         <br><br>
         Refreshes: {st.session_state.refresh_count}
         <br>10,000 Monte Carlo sims/cycle
+        <hr style="border-color: rgba(88,166,255,0.15); margin: 0.8rem 0;">
+        ⚠️ <b>API Limits Active</b>: Refresh is delayed to conserve the 100 free hits/day.
+        <br><br>
+        Want to sponsor this dashboard and pay for a premium, real-time live Cricket API endpoint? 
+        <br>Reach out to me at:<br>
+        <a href="mailto:osmanimadhavi@gmail.com" style="color: #ff9500; font-weight: bold; letter-spacing: 0.5px; text-decoration: none;">osmanimadhavi@gmail.com</a>
     </div>
     """, unsafe_allow_html=True)
 
@@ -929,7 +934,7 @@ def main():
 
     # Auto-refresh mechanism
     if st.session_state.auto_refresh:
-        time.sleep(10)
+        time.sleep(150) # Increased lag to avoid hitting the API limit
         st.session_state.dashboard_data = st.session_state.simulator.refresh()
         st.session_state.refresh_count += 1
         st.rerun()
